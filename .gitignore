@@ -1,0 +1,12 @@
+# dependencies (none today, but never commit them)
+node_modules/
+
+# local test harness and its generated pages
+.test/
+zz-test-*.html
+
+# OS / editor noise
+.DS_Store
+*.log
+.env
+.env.*
