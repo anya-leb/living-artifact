@@ -33,27 +33,74 @@ html,body{height:100%;margin:0;background:var(--void);color:var(--ink);overflow:
 .label.gone{opacity:0;transform:translate(-50%,8px);transition-duration:2s}
 #placard h1{margin:0;font:400 clamp(10.5px,1vw,12.5px)/1 var(--font-display);letter-spacing:.62em;padding-left:.62em;
   text-transform:uppercase;color:var(--ink);opacity:.66;text-wrap:balance}
-#placard p,#whisper p{margin:0;font:300 italic clamp(13px,1.15vw,15px)/1.3 var(--font-note);color:var(--ink-dim);letter-spacing:.02em}
+#placard p{margin:0;font:300 italic clamp(13px,1.15vw,15px)/1.3 var(--font-note);color:var(--ink-dim);letter-spacing:.02em}
 #placard .rule{width:28px;height:1px;background:color-mix(in srgb,var(--ember) 45%,transparent)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (prefers-reduced-motion: reduce){ #veil,.label{transition-duration:.8s} }
+
+/* states: the page only scrolls once it is fully open */
+html[data-state="open"]{overflow-y:auto;height:auto}
+html[data-state="open"] body{overflow:visible;height:auto}
+html[data-state="open"] #stage{touch-action:pan-y}
+
+/* the artifact as a real control: an invisible circle that follows the sculpture on screen */
+#artifactBtn{position:fixed;left:0;top:0;width:10px;height:10px;margin:0;padding:0;border:0;border-radius:50%;
+  background:transparent;cursor:pointer;z-index:3;touch-action:none;-webkit-tap-highlight-color:transparent;will-change:transform}
+#artifactBtn:focus{outline:none}
+#artifactBtn:focus-visible{box-shadow:0 0 0 1px color-mix(in srgb,var(--frost) 55%,transparent),0 0 0 6px color-mix(in srgb,var(--frost) 10%,transparent)}
+
+/* step 2 placeholder site */
+#site{position:relative;z-index:2;max-width:880px;margin:0 auto;padding:46vh 16px 18vh;display:grid;gap:28px;
+  opacity:0;visibility:hidden;color:var(--ink)}
+.ph{border:1px dashed color-mix(in srgb,var(--frost) 35%,transparent);padding:28px;min-height:38vh;
+  background:color-mix(in srgb,var(--void) 35%,transparent)}
+.ph h2{margin:0 0 .6rem;font:400 clamp(18px,2.2vw,26px)/1.2 var(--font-display);letter-spacing:.04em}
+.ph p{margin:0;font:300 italic 15px/1.5 var(--font-note);color:var(--ink-dim)}
+.ph-hero{min-height:22vh}
+.ph-index{min-height:0;display:flex;flex-wrap:wrap;gap:12px;padding:16px}
+.ph-index a{flex:1 1 72px;min-height:72px;display:grid;place-items:end start;padding:10px;color:var(--ink-dim);
+  font:400 13px var(--font-display);text-decoration:none;border:1px solid color-mix(in srgb,var(--frost) 25%,transparent)}
+.ph-index a:focus-visible,.ph-close button:focus-visible{outline:1px solid var(--frost);outline-offset:3px}
+.ph-close{margin:0;text-align:center}
+.ph-close button{background:none;border:0;color:var(--ink-dim);font:300 italic 15px var(--font-note);cursor:pointer;text-decoration:underline;text-underline-offset:4px}
+.ph h2:focus{outline:none}
+#debug{position:fixed;left:8px;top:8px;z-index:9;padding:6px 8px;background:rgba(0,0,0,.6);color:#9fd8ff;
+  font:11px/1.3 ui-monospace,Menlo,monospace;pointer-events:none;white-space:pre}
 </style>
 </head>
 <body>
-<canvas id="stage" tabindex="0" role="img" aria-label="The Living Artifact: a floating sculpture of glass petals, liquid metal and porcelain. Press Enter to open it."></canvas>
+<canvas id="stage" role="img" aria-label="The Living Artifact: a floating sculpture of glass petals, liquid metal and porcelain."></canvas>
+<button id="artifactBtn" type="button" aria-label="Open the artifact"></button>
 <div id="veil"></div>
 <div id="placard" class="label" aria-live="polite">
   <h1>The Living Artifact</h1>
   <span class="rule" aria-hidden="true"></span>
-  <p id="hint">Move your cursor.</p>
+  <p id="hint">Move your cursor · click to open</p>
 </div>
-<div id="whisper" class="label" aria-live="polite"><p id="whisperText">Click to open it.</p></div>
-<p class="sr">Move the pointer to turn the sculpture. Click it, or press Enter, to watch it bloom and reassemble.</p>
+<p class="sr">Move the pointer to turn the sculpture. Click it, or press Enter on it, to open the site.</p>
+
+<!-- Step 2 placeholders: real content, type and scroll behaviour arrive in step 4. -->
+<main id="site" inert>
+  <section class="ph ph-hero" id="s-hero" data-piece="0">
+    <h2 id="heroHeading" tabindex="-1">[EDIT] 01 · Hero line</h2>
+    <p>Placeholder. Name and one-sentence positioning statement.</p>
+  </section>
+  <nav class="ph ph-index" aria-label="Sections">
+    <a href="#s-hero">01</a><a href="#s-work">02</a><a href="#s-approach">03</a><a href="#s-about">04</a><a href="#s-contact">05</a>
+  </nav>
+  <section class="ph" id="s-work" data-piece="1"><h2>[EDIT] 02 · Selected work</h2><p>Placeholder for three project cards.</p></section>
+  <section class="ph" id="s-approach" data-piece="2"><h2>[EDIT] 03 · Approach</h2><p>Placeholder for three principles.</p></section>
+  <section class="ph" id="s-about" data-piece="3"><h2>[EDIT] 04 · About</h2><p>Placeholder for a paragraph and a portrait frame.</p></section>
+  <section class="ph" id="s-contact" data-piece="4"><h2>[EDIT] 05 · Contact</h2><p>Placeholder for email and LinkedIn.</p></section>
+  <p class="ph-close"><button id="closeLink" type="button">Close the artifact</button></p>
+</main>
+<div id="debug" hidden></div>
 
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+  "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.13.0/index.js"
 } }
 </script>
 <script type="module">
@@ -63,6 +110,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { gsap } from 'gsap';
 
 /*
   The Living Artifact. One file, five modules plus a small shared core:
@@ -73,10 +121,10 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     particles     motes, dust, sparks and the cursor field that disturbs them
     post          composer: clamp, bloom glow, tone mapping, lens finish
     input         pointer + keyboard, engagement and hover
-    stateMachine  closed / opening / open / closing (step 1: closed only)
+    stateMachine  closed / opening / open / closing, the #open hash, GSAP timelines
 
-  Construction order matters: object ids and the Math.random() sequence
-  are kept identical to v1 so the refactor renders pixel-for-pixel the same.
+  Construction order follows v1 (object ids and the Math.random() sequence),
+  which keeps the closed state directly comparable with v1 in stepped tests.
 */
 
 /* =================================================================== shared · helpers */
@@ -101,8 +149,12 @@ const canvas = document.getElementById('stage');
 const veil = document.getElementById('veil');
 const placard = document.getElementById('placard');
 const hint = document.getElementById('hint');
-const whisper = document.getElementById('whisper');
-const whisperText = document.getElementById('whisperText');
+const artifactBtn = document.getElementById('artifactBtn');
+const site = document.getElementById('site');
+const heroHeading = document.getElementById('heroHeading');
+const closeLink = document.getElementById('closeLink');
+const debugEl = document.getElementById('debug');
+const DEBUG = new URLSearchParams(location.search).has('debug');
 
 const mqReduce = matchMedia('(prefers-reduced-motion: reduce)');
 const COARSE = matchMedia('(pointer: coarse)').matches;
@@ -112,7 +164,7 @@ const device = {
   lite: COARSE || Math.min(innerWidth, innerHeight) < 640
 };
 mqReduce.addEventListener?.('change', e => { device.reduced = e.matches; });
-if (device.coarse) { hint.textContent = 'Touch and drag.'; whisperText.textContent = 'Tap it to open.'; }
+if (device.coarse) hint.textContent = 'Touch and drag · tap to open';
 
 let renderer;
 try {
@@ -192,6 +244,9 @@ function createStage() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x030407);
   scene.fog = new THREE.FogExp2(0x030407, 0.05);
+  // the room warms from near-black to deep petrol as the core lights the page
+  const VOID = new THREE.Color(0x030407), PETROL = new THREE.Color(0x0b1f25);
+  let lastWarm = 0;
 
   const camera = new THREE.PerspectiveCamera(34, innerWidth / innerHeight, 0.1, 90);
   camera.position.set(0, 0.4, 9);
@@ -283,19 +338,26 @@ function createStage() {
   // camera: vertical mouse raises the eye, horizontal adds parallax; the bloom pulls back.
   // Lights follow the viewer so different surfaces catch them.
   function update(dt, input, art) {
-    const { simT } = sim, open = art.view.open, B = art.view.B, engage = input.engage;
+    const { simT } = sim, open = art.view.open, T = art.view.T, engage = input.engage;
     const dist = baseDist + open * 0.9 + (1 - art.view.intro) * 2.6;
     const tx = input.x * 0.55 * engage + Math.sin(simT * 0.13) * 0.05;
     const ty = 0.38 + input.y * 0.85 * engage + Math.sin(simT * 0.17) * 0.03 + open * 0.2;
     camPos.x = damp(camPos.x, tx, 2.2, dt); camPos.y = damp(camPos.y, ty, 2.2, dt); camPos.z = damp(camPos.z, dist, 2.2, dt);
     camera.position.copy(camPos);
     camera.lookAt(0, -0.12 + input.y * 0.08 * engage, 0);
-    const fov = BASE_FOV + (device.reduced ? 0 : open * 3 + B.flash * 1.5);
+    const fov = BASE_FOV + (device.reduced ? 0 : open * 3 + T.flash * 1.5);
     if (Math.abs(camera.fov - fov) > 1e-3) { camera.fov = fov; camera.updateProjectionMatrix(); }
 
     rim.position.set(-4.5 - input.x * 3 * engage, 2.5 + input.y * 1.5 * engage, -5);
     key.position.set(4 - input.x * 1.5 * engage, 1.2 + input.y * 2 * engage, 4.5);
     if (scene.environmentRotation) scene.environmentRotation.y = simT * 0.02 + input.x * 0.5 * engage;
+
+    if (T.warm !== lastWarm) {
+      lastWarm = T.warm;
+      scene.background.copy(VOID).lerp(PETROL, T.warm);
+      scene.fog.color.copy(scene.background);
+      document.body.style.backgroundColor = '#' + scene.background.getHexString();
+    }
   }
 
   return { scene, camera, spot, coreLight, resize, update };
@@ -420,7 +482,7 @@ function createArtifact({ scene, spot, coreLight }) {
   breathRig.add(blob);
 
   // glass petals: a twisted bud of lens-shaped shards, each hinged at its lower tip
-  const PETALS = 7;
+  const PETALS = 5;
   function petalGeometry(n) {
     const segU = 18, segV = 46, th0 = 0.17, th1 = Math.PI - 0.34;
     const half = (Math.PI / n) * 0.9, twist = 0.55;
@@ -566,44 +628,14 @@ function createArtifact({ scene, spot, coreLight }) {
   let shiver = 0, ringKick = 0, pulse = 0;
   const tmpV = new THREE.Vector3(), coreW = new THREE.Vector3(), camDir = new THREE.Vector3();
 
-  // What the other modules read each frame.
-  const B = { open: 0, flash: 0, spin: 0, slow: 1, tilt: 0 };
-  const view = { open: 0, br: 0, intro: 0, heat: 0, pulse: 0, B };
+  // Transition channels. The state machine's GSAP timelines tween them; `tease` follows a long hover.
+  const T = { open: 0, flash: 0, spin: 0, slow: 1, tilt: 0, dock: 0, warm: 0, tease: 0, petals: petals.map(() => ({ v: 0 })) };
+  const view = { open: 0, br: 0, intro: 0, heat: 0, pulse: 0, T };   // what the other modules read each frame
+  // docked: top centre of the screen at ~30% height (step 3 adds the corner position)
+  const DOCK_SCALE = 0.42, DOCK_NDC_Y = 0.5, dockW = new THREE.Vector3();
 
-  /* ---- the bloom (v1 behaviour; step 2 replaces it with the opening/closing timelines) */
-  let bloomT = -1, burstFired = false, snapFired = false, shockT = -1;
-  // petals: tiny inhale, burst open with overshoot, hold, then close with a soft click
-  function openCurve(t) {
-    if (t <= 0) return 0;
-    if (t < 0.22) return -0.07 * Math.sin(Math.PI * t / 0.22);
-    if (t < 1.35) return easeOutBack((t - 0.22) / 1.13, 0.9);
-    if (t < 2.5) return 1;
-    if (t < 4.3) return 1 - easeInOutCubic((t - 2.5) / 1.8);
-    if (t < 4.7) return -0.035 * Math.sin(Math.PI * (t - 4.3) / 0.4);
-    return 0;
-  }
-  function startBloom() {
-    if (bloomT >= 0) return false;
-    bloomT = 0; burstFired = false; snapFired = false;
-    return true;
-  }
-  function advanceBloom(dt) {
-    B.open = 0; B.flash = 0; B.spin = 0; B.slow = 1; B.tilt = 0;
-    if (bloomT >= 0) {
-      bloomT += dt;
-      const t = bloomT;
-      B.open = openCurve(t);
-      B.flash = Math.exp(-Math.pow((t - 0.3) / 0.11, 2)) + 0.3 * Math.exp(-Math.pow((t - 4.42) / 0.09, 2));
-      const sp = clamp((t - 0.18) / 3.9);
-      if (!device.reduced) {
-        B.spin = easeInOutCubic(sp) * TAU;
-        B.tilt = Math.sin(sp * Math.PI) * 0.22;
-        B.slow = 1 - 0.62 * smooth(0.22, 0.45, t) * (1 - smooth(0.9, 1.8, t));
-      }
-      if (t > 5.1) bloomT = -1;
-    }
-    view.open = Math.max(0, B.open);
-  }
+  /* ---- per frame: read the transition channels */
+  function advance() { view.open = Math.max(0, T.open); }
 
   /* ---- surprises: the piece occasionally does something of its own. Returns a particle burst, if any. */
   function surprise() {
@@ -651,9 +683,15 @@ function createArtifact({ scene, spot, coreLight }) {
     const intro = easeOutCubic(clamp(sim.clock / 4.2));
 
     floatRig.position.set(fx + shX.x, 0.02 + fy + shY.x - (1 - intro) * 0.35, 0);
-    leanRig.rotation.set(rotX.x + leanX.x + B.tilt + noise1(simT * 0.15 + 70) * 0.03, 0,
+    if (T.dock > 0) {
+      // a point at the artifact's depth that sits at the top centre of the screen
+      dockW.set(0, 0, 0).project(camera); dockW.set(0, DOCK_NDC_Y, dockW.z).unproject(camera);
+      floatRig.position.lerp(dockW, T.dock);
+      floatRig.scale.setScalar(lerp(1, DOCK_SCALE, T.dock));
+    } else floatRig.scale.setScalar(1);
+    leanRig.rotation.set(rotX.x + leanX.x + T.tilt + noise1(simT * 0.15 + 70) * 0.03, 0,
       leanZ.x + Math.sin(simT * 0.27) * 0.035 + noise1(simT * 0.18 + 50) * 0.03);
-    spinRig.rotation.y = autoA + rotY.x + freeA + B.spin;
+    spinRig.rotation.y = autoA + rotY.x + freeA + T.spin;
     breathRig.scale.setScalar((0.86 + 0.14 * intro) * (1 + br * 0.014));
     view.br = br; view.intro = intro;
   }
@@ -664,22 +702,22 @@ function createArtifact({ scene, spot, coreLight }) {
 
     for (let i = 0; i < PETALS; i++) {
       const p = petals[i];
-      const oi = bloomT >= 0 ? openCurve(bloomT - i * 0.035) : 0;
+      const oi = T.petals[i].v + T.tease * 0.14 * (1 - i * 0.1);
       const wob = hover * 0.07 * Math.sin(clock * 1.6 + p.seed * 20) + shiver * 0.07 * Math.sin(clock * 34 + i * 1.7) + br * 0.018;
       p.hinge.rotation.set(oi * 0.95 + wob, oi * 0.25 * p.sgn, oi * 0.38 * p.sgn);
       p.hinge.position.set(0, petalTip.y + Math.max(0, oi) * (0.12 + 0.22 * p.seed), petalTip.z + oi * (0.45 + 0.2 * p.seed));
     }
 
-    const heat = hover + pulse * 0.6;
+    const heat = hover + pulse * 0.6 + T.tease * 0.5;
     view.heat = heat; view.pulse = pulse;
-    glassRim.uRim.value = 0.12 + heat * 0.25 + open * 1.1 + B.flash * 1.5;
+    glassRim.uRim.value = 0.12 + heat * 0.25 + open * 1.1 + T.flash * 1.5;
     glassRim.uRimColor.value.setRGB(lerp(0.75, 1.0, open), lerp(0.9, 0.72, open), lerp(1.0, 0.5, open));
-    core.scale.setScalar(0.19 * (1 + open * 0.55 + B.flash * 0.25 + pulse * 0.1));
-    coreMat.uniforms.uIntensity.value = 2.2 + heat * 1.8 + open * 3.5 + B.flash * 8;
+    core.scale.setScalar(0.19 * (1 + open * 0.55 + T.flash * 0.25 + pulse * 0.1));
+    coreMat.uniforms.uIntensity.value = 2.2 + heat * 1.8 + open * 3.5 + T.flash * 8;
     BU.uTime.value += dt * (1 + hover * 1.2 + open * 2);
     BU.uAmp.value = 0.07 + hover * 0.04 + open * 0.12 + br * 0.01;
     BU.uHole.value = 0.3 - hover * 0.14 - open * 0.78 - pulse * 0.08;
-    BU.uGlow.value = 0.45 + heat * 1.0 + open * 2.5 + B.flash * 4;
+    BU.uGlow.value = 0.45 + heat * 1.0 + open * 2.5 + T.flash * 4;
     blob.scale.setScalar(0.5 * (1 + br * 0.02 - open * 0.12 + hover * 0.02));
     blob.rotation.y += dt * 0.1 * (1 + hover * 2);
 
@@ -690,7 +728,7 @@ function createArtifact({ scene, spot, coreLight }) {
       const amp = 0.05 + hover * 0.12;
       t.pivot.rotation.x = 0.1 + amp * noise1(simT * 0.5 + t.seed) + shiver * 0.08 * Math.sin(clock * 30 + k) + open * 0.75;
       t.pivot.rotation.z = amp * 0.8 * noise1(simT * 0.45 + t.seed + 100);
-      t.tipMat.color.copy(t.base).multiplyScalar(1.4 + heat * 2 + open * 3 + B.flash * 4);
+      t.tipMat.color.copy(t.base).multiplyScalar(1.4 + heat * 2 + open * 3 + T.flash * 4);
     }
 
     calyx.position.y = -open * 0.4 + Math.sin(simT * 0.9 + 1) * 0.008 * (1 + hover * 3);
@@ -719,25 +757,25 @@ function createArtifact({ scene, spot, coreLight }) {
     const open = view.open, heat = view.heat, hover = input.hover;
     core.getWorldPosition(coreW);
     coreLight.position.copy(coreW);
-    coreLight.intensity = 0.9 + heat * 1.2 + open * 4.5 + B.flash * 16;
+    coreLight.intensity = 0.9 + heat * 1.2 + open * 4.5 + T.flash * 16;
     coreGlow.position.copy(coreW); coreGlow.quaternion.copy(camera.quaternion);
-    coreGlow.scale.setScalar(1.3 * (1 + open * 0.35 + B.flash * 0.5 + hover * 0.1));
-    coreGlow.material.uniforms.uIntensity.value = 0.42 + heat * 0.35 + open * 0.3 + B.flash * 1.1;
+    coreGlow.scale.setScalar(1.3 * (1 + open * 0.35 + T.flash * 0.5 + hover * 0.1));
+    coreGlow.material.uniforms.uIntensity.value = 0.42 + heat * 0.35 + open * 0.3 + T.flash * 1.1;
     camera.getWorldDirection(camDir);
     halo.position.copy(coreW).addScaledVector(camDir, 2.5); halo.quaternion.copy(camera.quaternion);
-    halo.material.uniforms.uIntensity.value = 0.05 + hover * 0.025 + open * 0.06 + B.flash * 0.12;
-    beamMat.uniforms.uIntensity.value = 1 + open * 0.4 + B.flash * 0.8;
+    halo.material.uniforms.uIntensity.value = 0.05 + hover * 0.025 + open * 0.06 + T.flash * 0.12;
+    beamMat.uniforms.uIntensity.value = 1 + open * 0.4 + T.flash * 0.8;
   }
 
-  /* ---- bloom events: burst, sparks and shockwave at the opening; an implosion when it snaps shut */
-  function updateEffects(dt, camera, particles) {
-    if (bloomT >= 0 && !burstFired && bloomT >= 0.27) {
-      burstFired = true;
-      particles.F.burst = device.reduced ? 1.4 : 3.8;
-      particles.spawnSparks(coreW.x, coreW.y, coreW.z, device.reduced ? 0.35 : 1);
-      shockT = 0; shock.visible = true;
-    }
-    if (bloomT >= 0 && !snapFired && bloomT >= 4.35) { snapFired = true; particles.F.burst = -1.2; }
+  /* ---- transition events: burst, sparks and shockwave as the shell splits; an implosion as it snaps shut */
+  let shockT = -1;
+  function fireBurst(particles) {
+    particles.F.burst = device.reduced ? 1.4 : 3.8;
+    particles.spawnSparks(coreW.x, coreW.y, coreW.z, device.reduced ? 0.35 : 1);
+    shockT = 0; shock.visible = true;
+  }
+  function fireSnap(particles) { particles.F.burst = -1.2; }
+  function updateEffects(dt, camera) {
     if (shockT >= 0) {
       shockT += dt; const p = clamp(shockT / 1.7);
       shock.material.uniforms.uP.value = easeOutCubic(p);
@@ -747,9 +785,9 @@ function createArtifact({ scene, spot, coreLight }) {
   }
 
   return {
-    floatRig, view,
-    get blooming() { return bloomT >= 0; },
-    startBloom, advanceBloom, surprise, updateMotion, updateParts, updateGlow, updateEffects
+    floatRig, view, T,
+    hoverRadius: () => 1.15 * floatRig.scale.x,
+    advance, surprise, updateMotion, updateParts, updateGlow, updateEffects, fireBurst, fireSnap
   };
 }
 
@@ -865,7 +903,7 @@ function createParticles({ scene }) {
   const sparks = createSparks(device.lite ? 220 : 460);
 
   // The invisible field the cursor drags through: repel, swirl around the pointer ray, and carry along.
-  const F = { ox: 0, oy: 0, oz: 0, dx: 0, dy: 0, dz: -1, on: 0, rep: 1, swirl: 2.6, drag: 2.2, mvx: 0, mvy: 0, mvz: 0, cx: 0, cy: 0, cz: 0, burst: 0, open: 0, breath: 0, orbitMul: 1 };
+  const F = { ox: 0, oy: 0, oz: 0, dx: 0, dy: 0, dz: -1, on: 0, rep: 1, swirl: 2.6, drag: 2.2, mvx: 0, mvy: 0, mvz: 0, cx: 0, cy: 0, cz: 0, burst: 0, open: 0, breath: 0, orbitMul: 1, scale: 1 };
   const FA = new Float32Array(3);
   function fieldAccel(px, py, pz, R) {
     FA[0] = FA[1] = FA[2] = 0;
@@ -891,7 +929,7 @@ function createParticles({ scene }) {
     for (let i = 0; i < N; i++) {
       const i3 = i * 3;
       ph[i] += w[i] * F.orbitMul * dt;
-      const p = ph[i], rr = r[i] * (1 + F.breath * 0.035 + F.open * 0.4 * (0.4 + spread[i]));
+      const p = ph[i], rr = r[i] * (1 + F.breath * 0.035 + F.open * 0.4 * (0.4 + spread[i])) * F.scale;
       const c = Math.cos(p) * rr, s = Math.sin(p) * rr;
       const bx = F.cx + a[i3] * c + b[i3] * s;
       const by = F.cy + a[i3 + 1] * c + b[i3 + 1] * s + Math.sin(p * 3 + i) * wob[i];
@@ -995,8 +1033,8 @@ function createParticles({ scene }) {
     F.mvx = mouseVel.x; F.mvy = mouseVel.y; F.mvz = mouseVel.z;
     F.rep = 1.2 + Math.min(mouseSpeed, 4) * 0.75;
     art.floatRig.getWorldPosition(tmpV); F.cx = tmpV.x; F.cy = tmpV.y; F.cz = tmpV.z;
-    F.open = view.open; F.breath = view.br;
-    F.orbitMul = (1 + input.hover * 1.6 + view.open * 2.5 + view.pulse) * view.B.slow * (device.reduced ? 0.5 : 1);
+    F.open = view.open; F.breath = view.br; F.scale = art.floatRig.scale.x;
+    F.orbitMul = (1 + input.hover * 1.6 + view.open * 2.5 + view.pulse) * view.T.slow * (device.reduced ? 0.5 : 1);
 
     updateMotes(motes, sim.sdt);
     updateDust(dust, sim.sdt, sim.simT);
@@ -1061,22 +1099,24 @@ function createPost({ scene, camera }) {
     finish.uniforms.uAspect.value = w / h;
   }
   function update(view, input, mouseSpeed) {
-    const open = view.open, B = view.B;
+    const open = view.open, T = view.T;
     finish.uniforms.uTime.value = device.reduced ? 0 : sim.clock;
-    finish.uniforms.uCA.value = device.reduced ? 0.0012 : 0.0014 + B.flash * 0.012 + open * 0.0025 + Math.min(mouseSpeed, 4) * 0.0005;
-    bloomPass.strength = 0.42 + input.hover * 0.08 + open * 0.12 + B.flash * 0.45 + view.pulse * 0.15;
+    finish.uniforms.uCA.value = device.reduced ? 0.0012 : 0.0014 + T.flash * 0.012 + open * 0.0025 + Math.min(mouseSpeed, 4) * 0.0005;
+    bloomPass.strength = 0.42 + input.hover * 0.08 + open * 0.12 + T.flash * 0.45 + view.pulse * 0.15;
   }
   return { setSize, update, render: () => composer.render() };
 }
 
 /* =================================================================== input */
-function createInput({ canvas, camera, getCenter, onActivate, onEngage }) {
+// Pointer moves are read on the window so the cursor field keeps working over page content.
+// Activation comes only from the artifact button (pointer tap, or Enter / Space while it has focus).
+function createInput({ button, camera, getCenter, getRadius, onActivate, onEngage, onScrollIntent }) {
   const input = {
     x: 0, y: 0, px: 0, py: 0, inside: false, lastMove: -100, travel: 0, flickX: 0, flickY: 0, type: 'mouse',
     fieldReset: true,          // the particle field re-anchors the cursor after it re-enters
     engage: 0.2, hover: 0, hit: false
   };
-  let press = null;
+  let press = null, swipeY = null;
   function readPointer(e) {
     const nx = e.clientX / innerWidth * 2 - 1, ny = -(e.clientY / innerHeight * 2 - 1);
     if (input.inside) {
@@ -1087,29 +1127,34 @@ function createInput({ canvas, camera, getCenter, onActivate, onEngage }) {
     input.x = nx; input.y = ny; input.px = e.clientX; input.py = e.clientY;
     input.inside = true; input.lastMove = sim.clock; input.type = e.pointerType || 'mouse';
   }
-  canvas.addEventListener('pointermove', e => { readPointer(e); if (input.travel > 90) onEngage(); });
-  canvas.addEventListener('pointerdown', e => {
+  addEventListener('pointermove', e => { readPointer(e); if (input.travel > 90) onEngage(); });
+  addEventListener('pointerdown', e => {
     readPointer(e);
-    press = { t: sim.clock, travel: 0, hit: hoverTest() };
+    if (e.target === button) press = { t: sim.clock, travel: 0 };
     if (device.coarse) onEngage();
   });
-  canvas.addEventListener('pointerup', e => {
-    if (press && press.hit && press.travel < 14 && sim.clock - press.t < 0.8) onActivate();
+  addEventListener('pointerup', e => {
+    if (press && e.target === button && press.travel < 14 && sim.clock - press.t < 0.8) onActivate();
     press = null;
     if (e.pointerType !== 'mouse') input.inside = false;
   });
-  canvas.addEventListener('pointercancel', () => { press = null; input.inside = false; });
-  canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') input.inside = false; });
-  canvas.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onActivate(); }
-  });
+  addEventListener('pointercancel', () => { press = null; input.inside = false; });
+  addEventListener('pointerout', e => { if (!e.relatedTarget && e.pointerType === 'mouse') input.inside = false; });
+  button.addEventListener('click', e => { if (e.detail === 0) onActivate(); });   // keyboard: Enter / Space
+
+  // scrolling down or swiping up asks to open (only acted on while closed)
+  addEventListener('wheel', e => { if (e.deltaY > 2) onScrollIntent(); }, { passive: true });
+  addEventListener('touchstart', e => { swipeY = e.touches[0].clientY; }, { passive: true });
+  addEventListener('touchmove', e => {
+    if (swipeY !== null && swipeY - e.touches[0].clientY > 50) { swipeY = null; onScrollIntent(); }
+  }, { passive: true });
 
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   const hoverSphere = new THREE.Sphere(new THREE.Vector3(), 1.15);
   function hoverTest() {
     ndc.set(input.x, input.y); raycaster.setFromCamera(ndc, camera);
-    getCenter(hoverSphere.center);
+    getCenter(hoverSphere.center); hoverSphere.radius = getRadius();
     return raycaster.ray.intersectsSphere(hoverSphere);
   }
 
@@ -1126,15 +1171,107 @@ function createInput({ canvas, camera, getCenter, onActivate, onEngage }) {
 }
 
 /* =================================================================== stateMachine */
-// Step 1 stub: only `closed` exists, and activating plays the v1 bloom.
-// Step 2 adds opening / open / closing, the URL hash and the GSAP timelines.
-function createStateMachine({ onBloom }) {
-  const sm = {
-    state: 'closed',
-    request(action) {
-      if (action === 'activate' && sm.state === 'closed') onBloom();
+// closed -> opening -> open -> closing -> closed.
+// Input is locked during transitions; at most one request waits in the queue.
+// Each direction is one GSAP timeline that tweens the artifact's channels (and the page).
+// Timelines are paused and advanced from tick(), so they share the simulation clock.
+function createStateMachine({ artifact, particles, onChange }) {
+  const T = artifact.T, P = T.petals, root = document.documentElement;
+  let state = 'closed', tl = null, queued = null;
+
+  function opening() {
+    const t = gsap.timeline({ paused: true, onComplete: () => settle('open') });
+    if (device.reduced) {        // ~400ms crossfade; pieces simply appear in place
+      return t.to(T, { warm: 1, duration: 0.4, ease: 'none' }, 0)
+        .set(P, { v: 1 }, 0.2).set(T, { open: 1, dock: 1 }, 0.2)
+        .fromTo(site, { autoAlpha: 0, y: 0 }, { autoAlpha: 1, duration: 0.4, ease: 'none' }, 0);
     }
+    return t
+      // the shell inhales, then splits with a little overshoot, one piece after another
+      .to(P, { v: -0.07, duration: 0.2, ease: 'sine.inOut', stagger: 0.035 }, 0)
+      .to(P, { v: 1, duration: 1.0, ease: 'back.out(0.9)', stagger: 0.035 }, 0.2)
+      .to(T, { open: -0.07, duration: 0.2, ease: 'sine.inOut' }, 0)
+      .to(T, { open: 1, duration: 1.0, ease: 'back.out(0.9)' }, 0.2)
+      // the core flares and the particles burst; a beat of slow motion
+      .to(T, { flash: 1, duration: 0.1, ease: 'sine.in' }, 0.2)
+      .to(T, { flash: 0, duration: 0.3, ease: 'sine.out' }, 0.3)
+      .call(() => artifact.fireBurst(particles), null, 0.27)
+      .to(T, { slow: 0.38, duration: 0.2, ease: 'sine.inOut' }, 0.22)
+      .to(T, { slow: 1, duration: 0.8, ease: 'sine.inOut' }, 0.9)
+      // the whole structure turns once, tipping toward the viewer and back
+      .to(T, { spin: '+=' + TAU, duration: 1.7, ease: 'power2.inOut' }, 0.15)
+      .to(T, { tilt: 0.22, duration: 0.85, ease: 'sine.inOut' }, 0.15)
+      .to(T, { tilt: 0, duration: 0.85, ease: 'sine.inOut' }, 1.0)
+      // the room warms, the artifact docks, the page rises in behind it
+      .to(T, { warm: 1, duration: 1.4, ease: 'sine.inOut' }, 0.5)
+      .to(T, { dock: 1, duration: 1.0, ease: 'power3.inOut' }, 1.15)
+      .fromTo(site, { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.7, ease: 'power2.out' }, 1.5);
+  }
+
+  function closing() {
+    const t = gsap.timeline({ paused: true, onComplete: () => settle('closed') });
+    if (device.reduced) {
+      return t.to(site, { autoAlpha: 0, duration: 0.2, ease: 'none' }, 0)
+        .call(() => scrollTo(0, 0), null, 0.2)
+        .set(P, { v: 0 }, 0.2).set(T, { open: 0, dock: 0 }, 0.2)
+        .to(T, { warm: 0, duration: 0.4, ease: 'none' }, 0);
+    }
+    return t
+      // content goes first, then the pieces fly home, calmer and quicker than the opening
+      .to(site, { autoAlpha: 0, y: 12, duration: 0.35, ease: 'power1.in' }, 0)
+      .call(() => scrollTo(0, 0), null, 0.35)
+      .to(T, { dock: 0, duration: 0.8, ease: 'power2.inOut' }, 0.2)
+      .to(T, { spin: '+=0.9', duration: 1.3, ease: 'power2.inOut' }, 0.2)
+      .to(T, { warm: 0, duration: 1.2, ease: 'sine.inOut' }, 0.3)
+      .to(P, { v: 0, duration: 0.8, ease: 'power3.inOut', stagger: { each: 0.03, from: 'end' } }, 0.4)
+      .to(T, { open: 0, duration: 0.8, ease: 'power3.inOut' }, 0.4)
+      // the shell clicks shut: a small overshoot, a soft flash, particles drawn back in
+      .to(P, { v: -0.035, duration: 0.12, ease: 'sine.out' }, 1.32)
+      .to(P, { v: 0, duration: 0.2, ease: 'sine.inOut' }, 1.44)
+      .to(T, { flash: 0.3, duration: 0.06, ease: 'sine.in' }, 1.32)
+      .to(T, { flash: 0, duration: 0.2, ease: 'sine.out' }, 1.38)
+      .call(() => artifact.fireSnap(particles), null, 1.32);
+  }
+
+  function setState(next) { state = next; root.dataset.state = next; onChange(next); }
+
+  function begin(next, opts) {
+    setState(next);
+    if (next === 'opening') {
+      if (!opts.fromHistory && location.hash !== '#open') history.pushState({ la: 'open' }, '', '#open');
+      tl = opening();
+    } else {
+      site.inert = true;
+      if (!opts.fromHistory && location.hash === '#open') {
+        if (history.state && history.state.la === 'open') history.back();
+        else history.replaceState(null, '', location.pathname + location.search);
+      }
+      tl = closing();
+    }
+  }
+
+  function settle(next) {
+    tl = null;
+    setState(next);
+    if (next === 'open') { site.inert = false; heroHeading.focus({ preventScroll: true }); }
+    else artifactBtn.focus({ preventScroll: true });
+    if (queued) { const q = queued; queued = null; sm.request(q.action, q.opts); }
+  }
+
+  const sm = {
+    get state() { return state; },
+    get busy() { return state === 'opening' || state === 'closing'; },
+    get queued() { return queued ? queued.action : null; },
+    // action: 'open' | 'close' | 'toggle'; opts.fromHistory when the URL already changed
+    request(action, opts = {}) {
+      if (sm.busy) { queued = { action, opts }; return; }
+      const want = action === 'toggle' ? (state === 'closed' ? 'open' : 'close') : action;
+      if (want === 'open' && state === 'closed') begin('opening', opts);
+      else if (want === 'close' && state === 'open') begin('closing', opts);
+    },
+    advance(dt) { if (tl) tl.time(tl.time() + dt); }
   };
+  root.dataset.state = state;
   return sm;
 }
 
@@ -1163,49 +1300,63 @@ function watchPerformance(raw) {
   if (avg > 1 / 42 && dpr > 1) { dpr = Math.max(1, dpr - 0.25); applySize(); }
 }
 
-/* intro copy: the placard, and the one-time "click to open" whisper */
-let placardShownAt = Infinity, dismissWanted = false, dismissed = false;
-let whisperShown = false, whisperAt = 0, hoverTime = 0, bloomedOnce = false;
+/* intro placard: shows after the room fades in, leaves once the viewer starts interacting or opens the piece */
+let placardShownAt = Infinity, dismissWanted = false, dismissed = false, hoverTime = 0;
 function requestDismiss() { dismissWanted = true; }
-function showWhisper() { if (whisperShown || bloomedOnce) return; whisperShown = true; whisperAt = sim.clock; whisper.classList.add('show'); }
-function hideWhisper() { whisper.classList.remove('show'); whisper.classList.add('gone'); }
-function updateCopy(dt, input) {
-  hoverTime = input.hit ? hoverTime + dt : 0;
-  if (hoverTime > 0.9 && !device.coarse) showWhisper();
-  if (device.coarse && dismissed && !whisperShown && sim.clock - placardShownAt > 6) showWhisper();
-  if (whisperShown && sim.clock - whisperAt > 4) hideWhisper();
-}
 function updatePlacard() {
-  if (placardShownAt === Infinity && sim.clock > 1.6) { placardShownAt = sim.clock; placard.classList.add('show'); }
+  if (placardShownAt === Infinity && sim.clock > 1.6 && sm.state === 'closed') { placardShownAt = sim.clock; placard.classList.add('show'); }
   if (dismissWanted && !dismissed && sim.clock > placardShownAt + 2.2) { dismissed = true; placard.classList.add('gone'); }
 }
 
 const sm = createStateMachine({
-  onBloom() {
-    if (!artifact.startBloom()) return;
-    bloomedOnce = true; requestDismiss(); hideWhisper();
+  artifact, particles,
+  onChange(state) {
+    artifactBtn.setAttribute('aria-label', state === 'closed' || state === 'closing' ? 'Open the artifact' : 'Close the artifact');
+    if (state === 'opening') { dismissed = true; placard.classList.add('gone'); }
   }
 });
 const input = createInput({
-  canvas, camera,
+  button: artifactBtn, camera,
   getCenter: (v) => artifact.floatRig.getWorldPosition(v),
-  onActivate: () => sm.request('activate'),
-  onEngage: requestDismiss
+  getRadius: () => artifact.hoverRadius(),
+  onActivate: () => sm.request('toggle'),
+  onEngage: requestDismiss,
+  onScrollIntent: () => { if (sm.state === 'closed') sm.request('open'); }
 });
+closeLink.addEventListener('click', () => sm.request('close'));
+addEventListener('keydown', e => { if (e.key === 'Escape') sm.request('close'); });
+addEventListener('hashchange', () => sm.request(location.hash === '#open' ? 'open' : 'close', { fromHistory: true }));
+let openOnLoad = location.hash === '#open';
+
+// keep the invisible button over the sculpture
+const btnV = new THREE.Vector3();
+function placeButton() {
+  artifact.floatRig.getWorldPosition(btnV);
+  const d = camera.position.distanceTo(btnV);
+  btnV.project(camera);
+  const r = artifact.hoverRadius() / (d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * innerHeight / 2;
+  const x = (btnV.x + 1) / 2 * innerWidth, y = (1 - btnV.y) / 2 * innerHeight;
+  artifactBtn.style.width = artifactBtn.style.height = (2 * r).toFixed(1) + 'px';
+  artifactBtn.style.transform = `translate(${(x - r).toFixed(1)}px, ${(y - r).toFixed(1)}px)`;
+}
 
 let nextTwitch = rand(9, 15);
 
 /* one simulation step; order matters (springs read the input, particles read the artifact) */
 function tick(dt) {
   sim.clock += dt;
-  artifact.advanceBloom(dt);
-  sim.sdt = dt * artifact.view.B.slow;
+  if (openOnLoad && sim.clock > 0.9) { openOnLoad = false; sm.request('open', { fromHistory: true }); }
+  sm.advance(dt);
+  artifact.advance();
+  sim.sdt = dt * artifact.T.slow;
   sim.simT += sim.sdt;
 
   input.update(dt);
-  updateCopy(dt, input);
+  // a long hover while closed half-opens the shell, as a teaser
+  hoverTime = input.hit ? hoverTime + dt : 0;
+  artifact.T.tease = damp(artifact.T.tease, sm.state === 'closed' && hoverTime >= 1.2 ? 1 : 0, 2.5, dt);
 
-  if (!device.reduced && !artifact.blooming && sim.clock > nextTwitch) {
+  if (!device.reduced && !sm.busy && sim.clock > nextTwitch) {
     nextTwitch = sim.clock + rand(7, 17);
     const burst = artifact.surprise();
     if (burst) particles.F.burst = burst;
@@ -1215,18 +1366,19 @@ function tick(dt) {
   artifact.updateParts(dt, input);
   stage.update(dt, input, artifact);
   artifact.updateGlow(camera, input);
-  artifact.updateEffects(dt, camera, particles);
+  artifact.updateEffects(dt, camera);
   particles.update(dt, input, camera, artifact);
 
   particles.syncUniforms(camera, artifact);
   U.time.value = sim.clock;
   post.update(artifact.view, input, particles.mouseSpeed);
+  placeButton();
   updatePlacard();
 }
 
 /* =================================================================== loop */
 renderer.compile(stage.scene, camera);
-let last = performance.now(), firstFrame = true;
+let last = performance.now(), firstFrame = true, fpsT = 0, fpsN = 0;
 function frame(now) {
   requestAnimationFrame(frame);
   const raw = Math.max(0, (now - last) / 1000); last = now;
@@ -1234,11 +1386,16 @@ function frame(now) {
   post.render();
   watchPerformance(raw);
   if (firstFrame) { firstFrame = false; requestAnimationFrame(() => veil.classList.add('lift')); }
+  if (DEBUG) {
+    fpsT += raw; fpsN++;
+    if (fpsT > 0.5) { debugEl.textContent = `fps ${Math.round(fpsN / fpsT)}  dpr ${dpr}\nstate ${sm.state}${sm.queued ? '  queued ' + sm.queued : ''}`; fpsT = fpsN = 0; }
+  }
 }
 requestAnimationFrame(frame);
 
-// ?debug: step the simulation by hand (used by the refactor tests and later by the FPS/state overlay)
-if (new URLSearchParams(location.search).has('debug')) {
+// ?debug: FPS + state overlay, and hooks to step the simulation by hand in tests
+if (DEBUG) {
+  debugEl.hidden = false;
   window.LA = {
     sm, sim, input, artifact,
     step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) tick(dt); post.render(); }
