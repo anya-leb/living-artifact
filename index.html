@@ -163,6 +163,8 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger.js';
+import { TAU, clamp, lerp, smooth, damp, rand, easeOutCubic, easeInOutCubic, NOISE, UV_VERT, color } from './lib/kit.js';
+import * as prime from './species/prime.js';
 gsap.registerPlugin(ScrollTrigger);
 
 /* Story hero tuning: the four numbers to play with. */
@@ -176,9 +178,11 @@ const DEPTH_TUNING = {
 /*
   The Living Artifact. One file, five modules plus a small shared core:
 
-    shared        helpers, device flags, renderer, GLSL, the simulation clock
+    lib/kit.js    shared helpers and GLSL (also used by every species)
+    species/*.js  each sculpture as data (config) + its build(config, ctx)
+    shared        device flags, renderer, the simulation clock
     stage         scene, camera, studio environment, room and lights
-    artifact      the sculpture: materials, parts, motion, the bloom
+    species       registry; the main stage builds whichever species it is given
     particles     motes, dust, sparks and the cursor field that disturbs them
     post          composer: clamp, bloom glow, tone mapping, lens finish
     input         pointer + keyboard, engagement and hover
@@ -188,23 +192,6 @@ const DEPTH_TUNING = {
   Construction order follows v1 (object ids and the Math.random() sequence),
   which keeps the closed state directly comparable with v1 in stepped tests.
 */
-
-/* =================================================================== shared · helpers */
-const TAU = Math.PI * 2;
-const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
-const lerp = (a, b, t) => a + (b - a) * t;
-const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
-const damp = (a, b, lambda, dt) => lerp(a, b, 1 - Math.exp(-lambda * dt));
-const rand = (a, b) => a + Math.random() * (b - a);
-const easeOutCubic = x => 1 - Math.pow(1 - x, 3);
-const easeInOutCubic = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-const easeOutBack = (x, s = 1.2) => 1 + (s + 1) * Math.pow(x - 1, 3) + s * Math.pow(x - 1, 2);
-const noise1 = (() => {           // smooth 1D value noise, for motion that never quite repeats
-  const P = new Float32Array(512); for (let i = 0; i < 512; i++) P[i] = Math.random() * 2 - 1;
-  return x => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return lerp(P[i & 511], P[(i + 1) & 511], u); };
-})();
-const spring = () => ({ x: 0, v: 0 });
-const stepSpring = (s, target, k, c, dt) => { s.v += (k * (target - s.x) - c * s.v) * dt; s.x += s.v * dt; };
 
 /* =================================================================== shared · page, device, renderer */
 const canvas = document.getElementById('stage');
@@ -244,57 +231,6 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-/* =================================================================== shared · GLSL */
-const NOISE = /* glsl */`
-vec3 laMod289(vec3 x){ return x - floor(x * (1.0/289.0)) * 289.0; }
-vec4 laMod289(vec4 x){ return x - floor(x * (1.0/289.0)) * 289.0; }
-vec4 laPermute(vec4 x){ return laMod289(((x*34.0)+1.0)*x); }
-vec4 laTaylorInvSqrt(vec4 r){ return 1.79284291400159 - 0.85373472095314 * r; }
-float laNoise(vec3 v){
-  const vec2 C = vec2(1.0/6.0, 1.0/3.0);
-  const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
-  vec3 i = floor(v + dot(v, C.yyy));
-  vec3 x0 = v - i + dot(i, C.xxx);
-  vec3 g = step(x0.yzx, x0.xyz);
-  vec3 l = 1.0 - g;
-  vec3 i1 = min(g.xyz, l.zxy);
-  vec3 i2 = max(g.xyz, l.zxy);
-  vec3 x1 = x0 - i1 + C.xxx;
-  vec3 x2 = x0 - i2 + C.yyy;
-  vec3 x3 = x0 - D.yyy;
-  i = laMod289(i);
-  vec4 p = laPermute(laPermute(laPermute(
-            i.z + vec4(0.0, i1.z, i2.z, 1.0))
-          + i.y + vec4(0.0, i1.y, i2.y, 1.0))
-          + i.x + vec4(0.0, i1.x, i2.x, 1.0));
-  float n_ = 0.142857142857;
-  vec3 ns = n_ * D.wyz - D.xzx;
-  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
-  vec4 x_ = floor(j * ns.z);
-  vec4 y_ = floor(j - 7.0 * x_);
-  vec4 x = x_ * ns.x + ns.yyyy;
-  vec4 y = y_ * ns.x + ns.yyyy;
-  vec4 h = 1.0 - abs(x) - abs(y);
-  vec4 b0 = vec4(x.xy, y.xy);
-  vec4 b1 = vec4(x.zw, y.zw);
-  vec4 s0 = floor(b0)*2.0 + 1.0;
-  vec4 s1 = floor(b1)*2.0 + 1.0;
-  vec4 sh = -step(h, vec4(0.0));
-  vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
-  vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
-  vec3 q0 = vec3(a0.xy, h.x);
-  vec3 q1 = vec3(a0.zw, h.y);
-  vec3 q2 = vec3(a1.xy, h.z);
-  vec3 q3 = vec3(a1.zw, h.w);
-  vec4 norm = laTaylorInvSqrt(vec4(dot(q0,q0), dot(q1,q1), dot(q2,q2), dot(q3,q3)));
-  q0 *= norm.x; q1 *= norm.y; q2 *= norm.z; q3 *= norm.w;
-  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
-  m = m * m;
-  return 42.0 * dot(m*m, vec4(dot(q0,x0), dot(q1,x1), dot(q2,x2), dot(q3,x3)));
-}`;
-
-const UV_VERT = /* glsl */`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
 
 /* =================================================================== shared · clock */
 // clock: real seconds since start. simT: ambient time, slowed during the bloom's slow-motion beat.
@@ -425,438 +361,18 @@ function createStage() {
   return { scene, camera, spot, coreLight, resize, update };
 }
 
-/* =================================================================== artifact */
-function createArtifact({ scene, spot, coreLight }) {
-  /* ---- materials */
-  const glassMat = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, metalness: 0, roughness: 0.04, transmission: 1, thickness: 0.95, ior: 1.52,
-    dispersion: 0.9, iridescence: 0.95, iridescenceIOR: 1.33, iridescenceThicknessRange: [140, 520],
-    attenuationColor: new THREE.Color(0xb6e2ff), attenuationDistance: 0.9,
-    specularIntensity: 1, clearcoat: 1, clearcoatRoughness: 0.04, envMapIntensity: 1.6,
-    side: THREE.DoubleSide, depthWrite: false
-  });
-  // Glass edges catch the core's light: a fresnel rim that brightens on hover and when the petals open.
-  const glassRim = { uRim: { value: 0.1 }, uRimColor: { value: new THREE.Color(0.75, 0.9, 1.0) } };
-  glassMat.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, glassRim);
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', `#include <common>
-        uniform float uRim; uniform vec3 uRimColor;`)
-      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        float laF = pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 3.0);
-        totalEmissiveRadiance += uRimColor * laF * uRim;`);
-  };
-  glassMat.customProgramCacheKey = () => 'living-artifact-glass';
-  const chromeMat = new THREE.MeshPhysicalMaterial({ color: 0xdfe5ee, metalness: 1, roughness: 0.1, envMapIntensity: 1.4, clearcoat: 0.4 });
-  const goldMat = new THREE.MeshPhysicalMaterial({ color: 0xe2b77d, metalness: 1, roughness: 0.2, envMapIntensity: 1.25 });
-  const porcelainMat = new THREE.MeshPhysicalMaterial({
-    color: 0xf2ede5, roughness: 0.32, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.07,
-    sheen: 0.45, sheenColor: new THREE.Color(0xfff3e6), sheenRoughness: 0.55, envMapIntensity: 0.85
-  });
-
-  // Liquid metal: a displaced chrome sphere whose surface opens into molten-edged holes.
-  const BU = {
-    uTime: { value: 0 }, uAmp: { value: 0.07 }, uHole: { value: 0.34 },
-    uGlow: { value: 1.2 }, uGlowColor: { value: new THREE.Color(1.0, 0.5, 0.2) }
-  };
-  const blobMat = new THREE.MeshPhysicalMaterial({ color: 0xd3d9e2, metalness: 1, roughness: 0.07, envMapIntensity: 1.5, side: THREE.DoubleSide });
-  blobMat.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, BU);
-    sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', `#include <common>
-        uniform float uTime; uniform float uAmp;
-        varying vec3 vLaDir;
-        ${NOISE}
-        vec3 laDisplace(vec3 d){
-          float n = laNoise(d * 1.5 + vec3(0.0, uTime * 0.35, uTime * 0.1)) * 0.7 + laNoise(d * 3.2 - vec3(uTime * 0.22)) * 0.3;
-          return d * (1.0 + uAmp * n);
-        }`)
-      .replace('#include <beginnormal_vertex>', `
-        vec3 laN = normalize(position);
-        vec3 laRef = abs(laN.y) > 0.98 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
-        vec3 laT = normalize(cross(laN, laRef));
-        vec3 laB = cross(laN, laT);
-        vec3 laP0 = laDisplace(laN);
-        vec3 laP1 = laDisplace(normalize(laN + laT * 0.02));
-        vec3 laP2 = laDisplace(normalize(laN + laB * 0.02));
-        vec3 objectNormal = normalize(cross(laP1 - laP0, laP2 - laP0));
-        vLaDir = laN;
-        #ifdef USE_TANGENT
-          vec3 objectTangent = vec3( tangent.xyz );
-        #endif`)
-      .replace('#include <begin_vertex>', `vec3 transformed = laP0;`);
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', `#include <common>
-        uniform float uTime; uniform float uHole; uniform float uGlow; uniform vec3 uGlowColor;
-        varying vec3 vLaDir;
-        ${NOISE}`)
-      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
-        float laH = laNoise(vLaDir * 2.2 + vec3(uTime * 0.11, -uTime * 0.07, uTime * 0.05)) * 0.75
-                  + laNoise(vLaDir * 5.5 - uTime * 0.09) * 0.25;
-        if (laH > uHole) discard;
-        float laEdge = smoothstep(uHole - 0.16, uHole, laH);`)
-      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        totalEmissiveRadiance += uGlowColor * uGlow * laEdge * laEdge;
-        if (!gl_FrontFacing) totalEmissiveRadiance += uGlowColor * uGlow * 0.12;`);
-  };
-  blobMat.customProgramCacheKey = () => 'living-artifact-blob';
-
-  const coreMat = new THREE.ShaderMaterial({
-    uniforms: { uTime: U.time, uIntensity: { value: 2 },
-      uHot: { value: new THREE.Color(1.0, 0.94, 0.82) }, uEdge: { value: new THREE.Color(1.0, 0.42, 0.14) } },
-    vertexShader: `varying vec3 vN; varying vec3 vV; varying vec3 vP;
-      void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vP = position; gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: `uniform float uTime, uIntensity; uniform vec3 uHot, uEdge; varying vec3 vN, vV, vP; ${NOISE}
-      void main(){
-        float f = 1.0 - max(dot(normalize(vN), normalize(vV)), 0.0);
-        float n = laNoise(vP * 3.5 + vec3(0.0, uTime * 0.7, uTime * 0.3)) * 0.5 + 0.5;
-        vec3 c = mix(uHot, uEdge, clamp(f * 1.2 + n * 0.3 - 0.1, 0.0, 1.0));
-        gl_FragColor = vec4(c * uIntensity * (0.75 + 0.5 * n) * (1.0 - 0.45 * f), 1.0);
-      }`
-  });
-
-  function glowMaterial(color, falloff, depthTest = false) {
-    return new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: color }, uIntensity: { value: 1 }, uFall: { value: falloff } },
-      transparent: true, depthWrite: false, depthTest, blending: THREE.AdditiveBlending,
-      vertexShader: UV_VERT,
-      fragmentShader: `uniform vec3 uColor; uniform float uIntensity, uFall; varying vec2 vUv;
-        void main(){ float d = length(vUv - 0.5) * 2.0; float a = exp(-d * d * uFall) * smoothstep(1.0, 0.65, d); gl_FragColor = vec4(uColor * a * uIntensity, 1.0); }`
-    });
-  }
-
-  /* ---- structure */
-  const floatRig = new THREE.Group(); scene.add(floatRig);   // bobbing + drift toward the cursor
-  const leanRig = new THREE.Group(); floatRig.add(leanRig);   // tilt (mouse Y, lean, tumble)
-  const spinRig = new THREE.Group(); leanRig.add(spinRig);    // yaw (mouse X, momentum, idle, bloom spin)
-  const breathRig = new THREE.Group(); spinRig.add(breathRig);
-
-  const shadowy = (m) => { m.castShadow = true; return m; };
-
-  // glowing core
-  const core = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), coreMat);
-  core.scale.setScalar(0.19);
-  breathRig.add(core);
-
-  // liquid metal
-  const blob = shadowy(new THREE.Mesh(new THREE.SphereGeometry(1, 144, 96), blobMat));
-  blob.scale.setScalar(0.5);
-  breathRig.add(blob);
-
-  // glass petals: a twisted bud of lens-shaped shards, each hinged at its lower tip
-  const PETALS = 5;
-  function petalGeometry(n) {
-    const segU = 18, segV = 46, th0 = 0.17, th1 = Math.PI - 0.34;
-    const half = (Math.PI / n) * 0.9, twist = 0.55;
-    const pos = [], idx = [];
-    for (let j = 0; j <= segV; j++) {
-      const w = j / segV, th = th0 + (th1 - th0) * w;
-      const prof = 0.22 + 0.78 * Math.pow(Math.sin(Math.PI * w), 0.65);
-      for (let i = 0; i <= segU; i++) {
-        const u = i / segU * 2 - 1;
-        const phi = u * half * prof + twist * (w - 1);
-        const r = 1 + 0.075 * Math.sin(Math.PI * w) * (1 - u * u) + 0.1 * Math.pow(1 - w, 4) * (1 - 0.5 * u * u);
-        pos.push(r * Math.sin(th) * Math.sin(phi), r * Math.cos(th), r * Math.sin(th) * Math.cos(phi));
-      }
-    }
-    for (let j = 0; j < segV; j++) for (let i = 0; i < segU; i++) {
-      const a = j * (segU + 1) + i, b = a + segU + 1;
-      idx.push(a, b, a + 1, b, b + 1, a + 1);
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setIndex(idx); g.computeVertexNormals();
-    return g;
-  }
-  const petalGeo = petalGeometry(PETALS);
-  const petalTip = new THREE.Vector3(0, Math.cos(Math.PI - 0.34), Math.sin(Math.PI - 0.34));
-  const petals = [];
-  for (let i = 0; i < PETALS; i++) {
-    const arm = new THREE.Group(); arm.rotation.y = i / PETALS * TAU;
-    const hinge = new THREE.Group(); hinge.position.copy(petalTip);
-    const mesh = shadowy(new THREE.Mesh(petalGeo, glassMat)); mesh.position.copy(petalTip).negate();
-    hinge.add(mesh); arm.add(hinge); breathRig.add(arm);
-    petals.push({ hinge, seed: Math.random(), sgn: i % 2 ? 1 : -1 });
-  }
-
-  // porcelain calyx with a scalloped lip and a gold inlay band
-  const calyx = new THREE.Group(); breathRig.add(calyx);
-  {
-    const prof = [[0.001, -1.30], [0.10, -1.295], [0.2, -1.26], [0.31, -1.19], [0.42, -1.09], [0.52, -0.97], [0.6, -0.86],
-      [0.66, -0.78], [0.678, -0.742], [0.66, -0.73], [0.6, -0.79], [0.5, -0.915], [0.38, -1.025], [0.24, -1.105], [0.1, -1.145], [0.001, -1.155]]
-      .map(([x, y]) => new THREE.Vector2(x, y));
-    const g = new THREE.LatheGeometry(prof, 144);
-    const p = g.attributes.position;
-    for (let i = 0; i < p.count; i++) {
-      const x = p.getX(i), z = p.getZ(i), rr = Math.hypot(x, z), phi = Math.atan2(z, x);
-      p.setY(i, p.getY(i) + 0.032 * Math.cos(phi * PETALS) * smooth(0.45, 0.678, rr));
-    }
-    g.computeVertexNormals();
-    calyx.add(shadowy(new THREE.Mesh(g, porcelainMat)));
-    const band = shadowy(new THREE.Mesh(new THREE.TorusGeometry(0.603, 0.009, 10, 180), goldMat));
-    band.rotation.x = Math.PI / 2; band.position.y = -0.86; calyx.add(band);
-    const knot = shadowy(new THREE.Mesh(new THREE.SphereGeometry(0.05, 32, 16), goldMat));
-    knot.position.y = -1.3; calyx.add(knot);
-  }
-
-  // crown: porcelain bead with metal stamens tipped in light
-  const crown = new THREE.Group(); crown.position.y = 1.0; breathRig.add(crown);
-  {
-    const bead = shadowy(new THREE.Mesh(new THREE.SphereGeometry(0.062, 32, 20), porcelainMat)); bead.scale.set(1, 0.85, 1); crown.add(bead);
-    const ring = shadowy(new THREE.Mesh(new THREE.TorusGeometry(0.068, 0.007, 8, 48), goldMat)); ring.rotation.x = Math.PI / 2; crown.add(ring);
-  }
-  const TIP_COLORS = [new THREE.Color(0.55, 1.35, 2.1), new THREE.Color(2.2, 1.35, 0.6)];
-  const tendrils = [];
-  for (let k = 0; k < 5; k++) {
-    const arm = new THREE.Group(); arm.rotation.y = k / 5 * TAU + 0.4;
-    const pivot = new THREE.Group(); arm.add(pivot); crown.add(arm);
-    const L = rand(0.62, 1.0), c = rand(0.75, 1.2);
-    const pts = [[0, 0, 0], [0, 0.2, 0.03], [0, 0.45, 0.1], [0, 0.68, 0.22], [0, 0.86, 0.36], [0, 0.95, 0.5], [0, 0.93, 0.6], [0, 0.86, 0.64]]
-      .map(([x, y, z]) => new THREE.Vector3(x, y * L, z * c * L));
-    const curve = new THREE.CatmullRomCurve3(pts);
-    pivot.add(shadowy(new THREE.Mesh(new THREE.TubeGeometry(curve, 64, 0.0085, 6, false), k % 2 ? goldMat : chromeMat)));
-    const base = TIP_COLORS[k % 2];
-    const tipMat = new THREE.MeshBasicMaterial({ color: base.clone() });
-    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.024, 16, 12), tipMat);
-    tip.position.copy(pts[pts.length - 1]); pivot.add(tip);
-    tendrils.push({ pivot, tipMat, base, seed: Math.random() * 100 });
-  }
-
-  // kinetic rings: two gimballed hoops carrying porcelain and light beads
-  const beadGeo = new THREE.SphereGeometry(1, 24, 16);
-  function makeRing(radius, tube, mat, tiltX, tiltZ, beads) {
-    const prec = new THREE.Group(), tilt = new THREE.Group(), carrier = new THREE.Group();
-    tilt.rotation.set(tiltX, 0, tiltZ); prec.add(tilt); tilt.add(carrier);
-    tilt.add(shadowy(new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 8, 260), mat)));
-    for (const [ang, r, m] of beads) {
-      const b = shadowy(new THREE.Mesh(beadGeo, m)); b.scale.setScalar(r);
-      b.position.set(Math.cos(ang) * radius, Math.sin(ang) * radius, 0); carrier.add(b);
-    }
-    spinRig.add(prec);
-    return { prec, tilt, carrier, tiltX };
-  }
-  const beadGlowA = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.5, 0.7) });
-  const beadGlowB = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.7, 1.6, 2.4) });
-  const ringA = makeRing(1.36, 0.0065, chromeMat, Math.PI / 2 - 0.42, 0.15,
-    [[0, 0.045, porcelainMat], [2.1, 0.034, porcelainMat], [2.35, 0.018, beadGlowA], [4.2, 0.04, porcelainMat]]);
-  const ringB = makeRing(1.52, 0.0042, goldMat, Math.PI / 2 + 0.62, -0.35,
-    [[1.0, 0.03, porcelainMat], [3.9, 0.016, beadGlowB]]);
-
-  // pendant: a thread and a drop of liquid metal that swings on its own
-  const pendant = new THREE.Group(); leanRig.add(pendant);
-  const threadGeo = new THREE.CylinderGeometry(0.0032, 0.0032, 1, 6); threadGeo.translate(0, -0.5, 0);
-  const thread = new THREE.Mesh(threadGeo, goldMat); pendant.add(thread);
-  const drop = shadowy(new THREE.Mesh(new THREE.SphereGeometry(0.07, 48, 32), chromeMat)); drop.scale.set(1, 1.3, 1); pendant.add(drop);
-  const threadBead = shadowy(new THREE.Mesh(beadGeo, porcelainMat)); threadBead.scale.setScalar(0.022); pendant.add(threadBead);
-
-  // light that lives outside the rigs (billboards)
-  const coreGlow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), glowMaterial(new THREE.Color(1.0, 0.58, 0.28), 5.0));
-  coreGlow.renderOrder = 10; scene.add(coreGlow);
-  const halo = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), glowMaterial(new THREE.Color(0.22, 0.38, 0.75), 3.0, true));
-  halo.scale.setScalar(10); scene.add(halo);
-  const shock = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
-    uniforms: { uP: { value: 0 }, uColor: { value: new THREE.Color(1.0, 0.78, 0.55) } },
-    transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
-    vertexShader: UV_VERT,
-    fragmentShader: `uniform float uP; uniform vec3 uColor; varying vec2 vUv;
-      void main(){ float d = length(vUv - 0.5) * 2.0; float w = 0.015 + 0.14 * uP;
-        float ring = exp(-pow((d - uP) / w, 2.0)); float fade = (1.0 - uP) * (1.0 - uP);
-        gl_FragColor = vec4(uColor * ring * fade * 2.2, 1.0); }`
-  }));
-  shock.scale.setScalar(7.5); shock.visible = false; shock.renderOrder = 11; scene.add(shock);
-
-  // a soft beam falling from the spotlight onto the piece
-  const beamGeo = new THREE.CylinderGeometry(0.22, 2.3, 10, 64, 1, true); beamGeo.translate(0, -5, 0);
-  const beamMat = new THREE.ShaderMaterial({
-    uniforms: { uTime: U.time, uIntensity: { value: 1 }, uColor: { value: new THREE.Color(1.0, 0.9, 0.78) } },
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-    vertexShader: `varying float vH; varying vec3 vN; varying vec3 vV; varying vec3 vW;
-      void main(){ vH = -position.y / 10.0; vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; vec4 mv = viewMatrix * w;
-        vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: `uniform float uTime, uIntensity; uniform vec3 uColor; varying float vH; varying vec3 vN, vV, vW; ${NOISE}
-      void main(){ float f = pow(abs(dot(normalize(vN), normalize(vV))), 1.8);
-        float fall = smoothstep(0.0, 0.25, vH) * (1.0 - smoothstep(0.5, 1.0, vH));
-        float n = laNoise(vW * 0.9 + vec3(0.0, -uTime * 0.08, uTime * 0.03)) * 0.5 + 0.5;
-        gl_FragColor = vec4(uColor * f * fall * (0.5 + 0.5 * n) * uIntensity * 0.045, 1.0); }`
-  });
-  const beam = new THREE.Mesh(beamGeo, beamMat);
-  beam.position.copy(spot.position);
-  beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), spot.target.position.clone().sub(spot.position).normalize());
-  scene.add(beam);
-
-  /* ---- motion state */
-  const rotY = spring(), rotX = spring(), leanX = spring(), leanZ = spring(), shX = spring(), shY = spring(), pendX = spring(), pendZ = spring();
-  let prox = 0, freeV = 0, freeA = 0, autoA = 0;
-  let shiver = 0, ringKick = 0, pulse = 0;
-  const tmpV = new THREE.Vector3(), coreW = new THREE.Vector3(), camDir = new THREE.Vector3();
-
-  // Transition channels. The state machine's GSAP timelines tween them; `tease` follows a long hover.
-  const T = { open: 0, flash: 0, spin: 0, slow: 1, tilt: 0, dock: 0, warm: 0, tease: 0, petals: petals.map(() => ({ v: 0 })) };
-  const view = { open: 0, br: 0, intro: 0, heat: 0, pulse: 0, T };   // what the other modules read each frame
-  // docked: top centre of the screen at ~30% height (step 3 adds the corner position)
-  const DOCK_SCALE = 0.42, DOCK_NDC_Y = 0.5, dockW = new THREE.Vector3();
-
-  /* ---- per frame: read the transition channels */
-  function advance() { view.open = Math.max(0, T.open); }
-
-  /* ---- surprises: the piece occasionally does something of its own. Returns a particle burst, if any. */
-  function surprise() {
-    const sgn = Math.random() < 0.5 ? -1 : 1;
-    let burst = 0;
-    switch (Math.floor(Math.random() * 5)) {
-      case 0: rotY.v += sgn * rand(1.4, 2.4); leanX.v += rand(-0.6, 0.6); break;   // a glance
-      case 1: shiver = 1; break;                                                    // petals flutter
-      case 2: pulse = 1; burst = 0.7; break;                                         // a heartbeat
-      case 3: ringKick = sgn * 2.6; break;                                           // rings realign
-      case 4: pendZ.v += sgn * 2.2; pendX.v += rand(-1, 1); break;                  // the drop swings
-    }
-    return burst;
-  }
-
-  /* ---- motion: springs toward the cursor, momentum, idle float and breath */
-  function updateMotion(dt, input, camera) {
-    const { simT, sdt } = sim, hover = input.hover, engage = input.engage;
-    shiver *= Math.exp(-2.2 * dt); ringKick *= Math.exp(-1.2 * dt); pulse *= Math.exp(-2.5 * dt);
-
-    // where is the artifact on screen, and how close is the cursor?
-    camera.updateMatrixWorld();
-    floatRig.getWorldPosition(tmpV); tmpV.project(camera);
-    if (!Number.isFinite(tmpV.x) || !Number.isFinite(tmpV.y)) tmpV.set(0, 0, 0);
-    const ldx = (input.x - tmpV.x) * camera.aspect, ldy = input.y - tmpV.y, ld = Math.hypot(ldx, ldy) + 1e-4;
-    prox = damp(prox, input.inside ? (1 - smooth(0.3, 1.35, ld)) : 0, 3, dt);
-    const leanAmt = prox * smooth(0.04, 0.35, ld), nx = ldx / ld, ny = ldy / ld;
-
-    // rotation: underdamped springs give weight and overshoot; flicks add free spin
-    stepSpring(rotY, input.x * 0.95 * engage, 16, 4.2, dt);
-    stepSpring(rotX, input.y * 0.38 * engage, 16, 4.6, dt);
-    stepSpring(leanZ, -nx * 0.2 * leanAmt, 22, 5.5, dt);
-    stepSpring(leanX, -ny * 0.16 * leanAmt, 22, 5.5, dt);
-    stepSpring(shX, nx * 0.09 * leanAmt, 14, 5, dt);
-    stepSpring(shY, ny * 0.06 * leanAmt, 14, 5, dt);
-    freeV += input.flickX * (device.reduced ? 0.25 : 0.75); rotX.v += input.flickY * 1.1; input.flickX = input.flickY = 0;
-    freeV *= Math.exp(-1.35 * dt); freeA += freeV * dt;
-    autoA += sdt * (device.reduced ? 0.05 : 0.13 + 0.05 * noise1(simT * 0.07)) * (1 - 0.55 * hover);
-
-    // idle life
-    const floatAmp = device.reduced ? 0.4 : 1;
-    const fy = (Math.sin(simT * 0.61) * 0.075 + Math.sin(simT * 0.23 + 1.3) * 0.045 + noise1(simT * 0.35 + 10) * 0.03) * floatAmp;
-    const fx = (Math.sin(simT * 0.29 + 0.7) * 0.03 + noise1(simT * 0.2 + 30) * 0.02) * floatAmp;
-    const br = Math.sin(simT * 0.85 + Math.sin(simT * 0.13) * 1.8);
-    const intro = easeOutCubic(clamp(sim.clock / 4.2));
-
-    floatRig.position.set(fx + shX.x, 0.02 + fy + shY.x - (1 - intro) * 0.35, 0);
-    if (T.dock > 0) {
-      // a point at the artifact's depth that sits at the top centre of the screen
-      dockW.set(0, 0, 0).project(camera); dockW.set(0, DOCK_NDC_Y, dockW.z).unproject(camera);
-      floatRig.position.lerp(dockW, T.dock);
-      floatRig.scale.setScalar(lerp(1, DOCK_SCALE, T.dock));
-    } else floatRig.scale.setScalar(1);
-    leanRig.rotation.set(rotX.x + leanX.x + T.tilt + noise1(simT * 0.15 + 70) * 0.03, 0,
-      leanZ.x + Math.sin(simT * 0.27) * 0.035 + noise1(simT * 0.18 + 50) * 0.03);
-    spinRig.rotation.y = autoA + rotY.x + freeA + T.spin;
-    breathRig.scale.setScalar((0.86 + 0.14 * intro) * (1 + br * 0.014));
-    view.br = br; view.intro = intro;
-  }
-
-  /* ---- parts: petals, core, liquid metal, crown, calyx, rings, pendant */
-  function updateParts(dt, input) {
-    const { clock, simT, sdt } = sim, hover = input.hover, open = view.open, br = view.br;
-
-    for (let i = 0; i < PETALS; i++) {
-      const p = petals[i];
-      const oi = T.petals[i].v + T.tease * 0.14 * (1 - i * 0.1);
-      const wob = hover * 0.07 * Math.sin(clock * 1.6 + p.seed * 20) + shiver * 0.07 * Math.sin(clock * 34 + i * 1.7) + br * 0.018;
-      p.hinge.rotation.set(oi * 0.95 + wob, oi * 0.25 * p.sgn, oi * 0.38 * p.sgn);
-      p.hinge.position.set(0, petalTip.y + Math.max(0, oi) * (0.12 + 0.22 * p.seed), petalTip.z + oi * (0.45 + 0.2 * p.seed));
-    }
-
-    const heat = hover + pulse * 0.6 + T.tease * 0.5;
-    view.heat = heat; view.pulse = pulse;
-    glassRim.uRim.value = 0.12 + heat * 0.25 + open * 1.1 + T.flash * 1.5;
-    glassRim.uRimColor.value.setRGB(lerp(0.75, 1.0, open), lerp(0.9, 0.72, open), lerp(1.0, 0.5, open));
-    core.scale.setScalar(0.19 * (1 + open * 0.55 + T.flash * 0.25 + pulse * 0.1));
-    coreMat.uniforms.uIntensity.value = 2.2 + heat * 1.8 + open * 3.5 + T.flash * 8;
-    BU.uTime.value += dt * (1 + hover * 1.2 + open * 2);
-    BU.uAmp.value = 0.07 + hover * 0.04 + open * 0.12 + br * 0.01;
-    BU.uHole.value = 0.3 - hover * 0.14 - open * 0.78 - pulse * 0.08;
-    BU.uGlow.value = 0.45 + heat * 1.0 + open * 2.5 + T.flash * 4;
-    blob.scale.setScalar(0.5 * (1 + br * 0.02 - open * 0.12 + hover * 0.02));
-    blob.rotation.y += dt * 0.1 * (1 + hover * 2);
-
-    crown.position.y = 1.0 + open * 0.55;
-    crown.rotation.y = -autoA * 0.4 + open * 1.2 + noise1(simT * 0.3 + 5) * 0.2 * hover;
-    for (let k = 0; k < tendrils.length; k++) {
-      const t = tendrils[k];
-      const amp = 0.05 + hover * 0.12;
-      t.pivot.rotation.x = 0.1 + amp * noise1(simT * 0.5 + t.seed) + shiver * 0.08 * Math.sin(clock * 30 + k) + open * 0.75;
-      t.pivot.rotation.z = amp * 0.8 * noise1(simT * 0.45 + t.seed + 100);
-      t.tipMat.color.copy(t.base).multiplyScalar(1.4 + heat * 2 + open * 3 + T.flash * 4);
-    }
-
-    calyx.position.y = -open * 0.4 + Math.sin(simT * 0.9 + 1) * 0.008 * (1 + hover * 3);
-    calyx.rotation.y = simT * 0.04 - open * 0.9;
-    ringA.prec.rotation.y += sdt * (0.22 + hover * 0.8 + open * 2.6 + ringKick);
-    ringA.carrier.rotation.z += sdt * (0.35 + hover * 1.4 + open * 2);
-    ringA.tilt.rotation.x = ringA.tiltX + Math.sin(simT * 0.21) * 0.08 + open * 0.5;
-    ringA.prec.scale.setScalar(1 + open * 0.28);
-    ringB.prec.rotation.y -= sdt * (0.15 + hover * 0.6 + open * 1.8 + ringKick * 0.6);
-    ringB.carrier.rotation.z -= sdt * (0.25 + hover * 1.1 + open * 1.5);
-    ringB.tilt.rotation.x = ringB.tiltX + Math.sin(simT * 0.17 + 2) * 0.1 - open * 0.45;
-    ringB.prec.scale.setScalar(1 + open * 0.42);
-    beadGlowA.color.setRGB(2.4, 1.5, 0.7).multiplyScalar(1 + heat * 0.8 + open * 1.5);
-    beadGlowB.color.setRGB(0.7, 1.6, 2.4).multiplyScalar(1 + heat * 0.8 + open * 1.5);
-
-    stepSpring(pendX, -leanRig.rotation.x, 9, 0.8, dt);
-    stepSpring(pendZ, -leanRig.rotation.z, 9, 0.8, dt);
-    const len = 0.22 + open * 0.3;
-    pendant.position.y = (-1.3 - open * 0.4) * breathRig.scale.y;
-    pendant.rotation.set(pendX.x, 0, pendZ.x);
-    thread.scale.y = len; threadBead.position.y = -len * 0.55; drop.position.y = -(len + 0.09);
-  }
-
-  /* ---- light that follows the core: point light, billboards, the spotlight beam */
-  function updateGlow(camera, input) {
-    const open = view.open, heat = view.heat, hover = input.hover;
-    core.getWorldPosition(coreW);
-    coreLight.position.copy(coreW);
-    coreLight.intensity = 0.9 + heat * 1.2 + open * 4.5 + T.flash * 16;
-    coreGlow.position.copy(coreW); coreGlow.quaternion.copy(camera.quaternion);
-    coreGlow.scale.setScalar(1.3 * (1 + open * 0.35 + T.flash * 0.5 + hover * 0.1));
-    coreGlow.material.uniforms.uIntensity.value = 0.42 + heat * 0.35 + open * 0.3 + T.flash * 1.1;
-    camera.getWorldDirection(camDir);
-    halo.position.copy(coreW).addScaledVector(camDir, 2.5); halo.quaternion.copy(camera.quaternion);
-    halo.material.uniforms.uIntensity.value = 0.05 + hover * 0.025 + open * 0.06 + T.flash * 0.12;
-    beamMat.uniforms.uIntensity.value = 1 + open * 0.4 + T.flash * 0.8;
-  }
-
-  /* ---- transition events: burst, sparks and shockwave as the shell splits; an implosion as it snaps shut */
-  let shockT = -1;
-  function fireBurst(particles) {
-    particles.F.burst = device.reduced ? 1.4 : 3.8;
-    particles.spawnSparks(coreW.x, coreW.y, coreW.z, device.reduced ? 0.35 : 1);
-    shockT = 0; shock.visible = true;
-  }
-  function fireSnap(particles) { particles.F.burst = -1.2; }
-  // a story line was absorbed: one small heartbeat and a brief inward swirl
-  function absorb(particles) { pulse = Math.max(pulse, 0.6); particles.F.burst = -0.6; }
-  function updateEffects(dt, camera) {
-    if (shockT >= 0) {
-      shockT += dt; const p = clamp(shockT / 1.7);
-      shock.material.uniforms.uP.value = easeOutCubic(p);
-      shock.position.copy(coreW); shock.quaternion.copy(camera.quaternion);
-      if (p >= 1) { shockT = -1; shock.visible = false; }
-    }
-  }
-
-  return {
-    floatRig, view, T, DOCK_NDC_Y,
-    hoverRadius: () => 1.15 * floatRig.scale.x,
-    advance, surprise, updateMotion, updateParts, updateGlow, updateEffects, fireBurst, fireSnap, absorb
-  };
-}
+/* =================================================================== species */
+// A species is data plus the build function for its geometry recipe (see species/prime.js).
+// The main stage holds one built species at a time; setSpecies swaps configs, never meshes.
+const RECIPES = { prime: prime.build };
+const SPECIES = { prime: prime.config };
+// transition channels shared by the state machine and whichever species holds the stage
+const T = { open: 0, flash: 0, spin: 0, slow: 1, tilt: 0, dock: 0, warm: 0, tease: 0, petals: Array.from({ length: 5 }, () => ({ v: 0 })) };
+// docked: top centre of the screen at ~30% height (step 3 adds the corner position)
+const DOCK = { scale: 0.42, ndcY: 0.5 };
 
 /* =================================================================== particles */
-function createParticles({ scene }) {
+function createParticles({ scene, palette }) {
   const PU = { uTime: U.time, uScale: { value: 1000 }, uFocus: { value: 7 }, uAperture: { value: 0.2 } };
   function pointsMaterial() {
     return new THREE.ShaderMaterial({
@@ -894,7 +410,7 @@ function createParticles({ scene }) {
     return {
       N, g, pos: new Float32Array(N * 3), col: new Float32Array(N * 3), size: new Float32Array(N),
       seed: new Float32Array(N), alpha: new Float32Array(N), baseA: new Float32Array(N),
-      off: new Float32Array(N * 3), vel: new Float32Array(N * 3)
+      off: new Float32Array(N * 3), vel: new Float32Array(N * 3), role: new Uint8Array(N), mult: new Float32Array(N)
     };
   }
   function finishPoints(S) {
@@ -908,9 +424,10 @@ function createParticles({ scene }) {
     S.points = pts;
     return S;
   }
-  const GOLD = new THREE.Color(1.0, 0.62, 0.3), FROST = new THREE.Color(0.45, 0.8, 1.0),
-    PEARL = new THREE.Color(0.95, 0.92, 0.88), ROSE = new THREE.Color(1.0, 0.45, 0.55);
-  const pickColor = () => { const k = Math.random(); return k < 0.42 ? GOLD : k < 0.78 ? FROST : k < 0.95 ? PEARL : ROSE; };
+  // roles: 0 warm, 1 cool, 2 pale, 3 accent. Each particle keeps its role and brightness so a new palette can recolour it.
+  const ROLES = [color(THREE, palette.warm), color(THREE, palette.cool), color(THREE, palette.pale), color(THREE, palette.accent)];
+  const pickRole = () => { const k = Math.random(); return k < 0.42 ? 0 : k < 0.78 ? 1 : k < 0.95 ? 2 : 3; };
+  const paint = (S, i, role, m) => { const c = ROLES[role]; S.role[i] = role; S.mult[i] = m; S.col.set([c.r * m, c.g * m, c.b * m], i * 3); };
 
   // motes: orbit the artifact, half in a tilted disc, half in a loose shell
   function createMotes(N) {
@@ -927,8 +444,7 @@ function createParticles({ scene }) {
       S.a.set([a.x, a.y, a.z], i * 3); S.b.set([b.x, b.y, b.z], i * 3);
       S.r[i] = r; S.ph[i] = Math.random() * TAU; S.w[i] = 0.34 / Math.pow(r, 1.5) * rand(0.7, 1.3);
       S.wob[i] = band ? 0.02 : 0.08 * Math.random(); S.spread[i] = Math.random();
-      const c = pickColor(), m = rand(0.5, 1.5);
-      S.col.set([c.r * m, c.g * m, c.b * m], i * 3);
+      const role = pickRole(); paint(S, i, role, rand(0.5, 1.5));
       S.size[i] = (band ? rand(0.012, 0.022) : rand(0.01, 0.03)) * (Math.random() < 0.03 ? 2.6 : 1);
       S.seed[i] = Math.random(); S.alpha[i] = S.baseA[i] = rand(0.2, 0.7);
     }
@@ -944,8 +460,7 @@ function createParticles({ scene }) {
       S.home.set([x, y, z], i * 3);
       S.f.set([rand(.5, 1.5), rand(.5, 1.5), rand(.5, 1.5)], i * 3);
       S.s.set([rand(0, TAU), rand(0, TAU), rand(0, TAU)], i * 3);
-      const c = Math.random() < 0.7 ? PEARL : Math.random() < 0.5 ? FROST : GOLD, m = rand(0.3, 0.75);
-      S.col.set([c.r * m, c.g * m, c.b * m], i * 3);
+      const role = Math.random() < 0.7 ? 2 : Math.random() < 0.5 ? 1 : 0; paint(S, i, role, rand(0.3, 0.75));
       S.size[i] = rand(0.012, 0.04); S.seed[i] = Math.random(); S.alpha[i] = S.baseA[i] = rand(0.1, 0.42);
     }
     return finishPoints(S);
@@ -955,8 +470,7 @@ function createParticles({ scene }) {
     const S = makePoints(N);
     Object.assign(S, { life: new Float32Array(N), max: new Float32Array(N) });
     for (let i = 0; i < N; i++) {
-      const c = Math.random() < 0.65 ? GOLD : PEARL, m = rand(2, 4);
-      S.col.set([c.r * m, c.g * m, c.b * m], i * 3);
+      const role = Math.random() < 0.65 ? 0 : 2; paint(S, i, role, rand(2, 4));
       S.size[i] = rand(0.01, 0.028); S.seed[i] = Math.random(); S.baseA[i] = rand(0.5, 1); S.alpha[i] = 0;
       S.pos[i * 3 + 1] = -100;
     }
@@ -1112,8 +626,17 @@ function createParticles({ scene }) {
     PU.uScale.value = (innerHeight * dpr) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
   }
 
+  // recolour every particle for a new species, keeping each one's role and brightness
+  function setPalette(p) {
+    [p.warm, p.cool, p.pale, p.accent].forEach((c, k) => ROLES[k].setRGB(c[0], c[1], c[2]));
+    for (const S of [motes, dust, sparks]) {
+      for (let i = 0; i < S.N; i++) paint(S, i, S.role[i], S.mult[i]);
+      S.g.attributes.aColor.needsUpdate = true;
+    }
+  }
+
   return {
-    F, update, syncUniforms,
+    F, update, syncUniforms, setPalette,
     spawnSparks: (x, y, z, strength) => spawnSparks(sparks, x, y, z, strength),
     get mouseSpeed() { return mouseSpeed; }
   };
@@ -1241,7 +764,7 @@ function createInput({ button, camera, getCenter, getRadius, onActivate, onEngag
 //   d → 1   receding into the artifact (smaller, thinner, blurred, fading into the fog)
 //   d → -1  arriving from in front of the viewer (huge, heavier, blurred)
 // Departure and arrival overlap only while both lines are invisible, so two lines are never readable at once.
-function createStory({ section, artifact, particles }) {
+function createStory({ section, getArtifact, particles }) {
   const pin = section.querySelector('.story-pin');
   const plane = section.querySelector('.story-plane');
   const dots = [...section.querySelectorAll('.story-dots li')];
@@ -1284,7 +807,7 @@ function createStory({ section, artifact, particles }) {
 
   // the vanishing point is the docked artifact's position on screen
   function aim() {
-    pin.style.perspectiveOrigin = `${innerWidth / 2}px ${((1 - artifact.DOCK_NDC_Y) / 2 * innerHeight).toFixed(1)}px`;
+    pin.style.perspectiveOrigin = `${innerWidth / 2}px ${((1 - DOCK.ndcY) / 2 * innerHeight).toFixed(1)}px`;
   }
 
   function build() {
@@ -1352,7 +875,7 @@ function createStory({ section, artifact, particles }) {
       if (Math.abs(d) < best) { best = Math.abs(d); active = i; }
       // the artifact absorbs each line as it reaches the far end (on the way down only)
       if (i < N - 1) {
-        if (!b.absorbed && d >= 0.85) { b.absorbed = true; artifact.absorb(particles); }
+        if (!b.absorbed && d >= 0.85) { b.absorbed = true; getArtifact().absorb(particles); }
         else if (d < 0.6) b.absorbed = false;
       }
       if (d !== b.d) { b.d = d; render(b, d); }
@@ -1368,8 +891,8 @@ function createStory({ section, artifact, particles }) {
 // Input is locked during transitions; at most one request waits in the queue.
 // Each direction is one GSAP timeline that tweens the artifact's channels (and the page).
 // Timelines are paused and advanced from tick(), so they share the simulation clock.
-function createStateMachine({ artifact, particles, onChange }) {
-  const T = artifact.T, P = T.petals, root = document.documentElement;
+function createStateMachine({ getArtifact, particles, onChange }) {
+  const P = T.petals, root = document.documentElement;
   let state = 'closed', tl = null, queued = null;
 
   function opening() {
@@ -1388,7 +911,7 @@ function createStateMachine({ artifact, particles, onChange }) {
       // the core flares and the particles burst; a beat of slow motion
       .to(T, { flash: 1, duration: 0.1, ease: 'sine.in' }, 0.2)
       .to(T, { flash: 0, duration: 0.3, ease: 'sine.out' }, 0.3)
-      .call(() => artifact.fireBurst(particles), null, 0.27)
+      .call(() => getArtifact().fireBurst(particles), null, 0.27)
       .to(T, { slow: 0.38, duration: 0.2, ease: 'sine.inOut' }, 0.22)
       .to(T, { slow: 1, duration: 0.8, ease: 'sine.inOut' }, 0.9)
       // the whole structure turns once, tipping toward the viewer and back
@@ -1423,7 +946,7 @@ function createStateMachine({ artifact, particles, onChange }) {
       .to(P, { v: 0, duration: 0.2, ease: 'sine.inOut' }, 1.44)
       .to(T, { flash: 0.3, duration: 0.06, ease: 'sine.in' }, 1.32)
       .to(T, { flash: 0, duration: 0.2, ease: 'sine.out' }, 1.38)
-      .call(() => artifact.fireSnap(particles), null, 1.32);
+      .call(() => getArtifact().fireSnap(particles), null, 1.32);
   }
 
   function setState(next) { state = next; root.dataset.state = next; onChange(next); }
@@ -1475,8 +998,23 @@ function createStateMachine({ artifact, particles, onChange }) {
 /* =================================================================== assembly */
 const stage = createStage();
 const camera = stage.camera;
-const artifact = createArtifact({ scene: stage.scene, spot: stage.spot, coreLight: stage.coreLight });
-const particles = createParticles({ scene: stage.scene });
+const speciesCtx = { scene: stage.scene, spot: stage.spot, coreLight: stage.coreLight, U, sim, device, T, dock: DOCK };
+let currentSpecies = SPECIES.prime;
+let artifact = RECIPES[currentSpecies.recipe](currentSpecies, speciesCtx);
+const particles = createParticles({ scene: stage.scene, palette: currentSpecies.particles });
+const getArtifact = () => artifact;
+
+// Debug only: swap the main artifact for another species config, instantly.
+function setSpecies(config) {
+  const build = RECIPES[config.recipe];
+  if (!build) throw new Error(`No recipe "${config.recipe}". Known: ${Object.keys(RECIPES).join(', ')}`);
+  artifact.dispose();
+  currentSpecies = config;
+  artifact = build(config, speciesCtx);
+  particles.setPalette(config.particles);
+  renderer.compile(stage.scene, camera);
+  return artifact;
+}
 const post = createPost({ scene: stage.scene, camera });
 
 /* sizing + adaptive quality */
@@ -1506,7 +1044,7 @@ function updatePlacard() {
 }
 
 const sm = createStateMachine({
-  artifact, particles,
+  getArtifact, particles,
   onChange(state) {
     artifactBtn.setAttribute('aria-label', state === 'closed' || state === 'closing' ? 'Open the artifact' : 'Close the artifact');
     if (state === 'opening') { dismissed = true; placard.classList.add('gone'); }
@@ -1525,7 +1063,7 @@ addEventListener('keydown', e => { if (e.key === 'Escape') sm.request('close'); 
 addEventListener('hashchange', () => sm.request(location.hash === '#open' ? 'open' : 'close', { fromHistory: true }));
 let openOnLoad = location.hash === '#open';
 
-const story = createStory({ section: document.getElementById('s-story'), artifact, particles });
+const story = createStory({ section: document.getElementById('s-story'), getArtifact, particles });
 document.fonts.ready.then(() => story.build());
 let storyResize = 0;
 addEventListener('resize', () => { clearTimeout(storyResize); storyResize = setTimeout(story.resize, 150); });
@@ -1550,13 +1088,13 @@ function tick(dt) {
   if (openOnLoad && sim.clock > 0.9) { openOnLoad = false; sm.request('open', { fromHistory: true }); }
   sm.advance(dt);
   artifact.advance();
-  sim.sdt = dt * artifact.T.slow;
+  sim.sdt = dt * T.slow;
   sim.simT += sim.sdt;
 
   input.update(dt);
   // a long hover while closed half-opens the shell, as a teaser
   hoverTime = input.hit ? hoverTime + dt : 0;
-  artifact.T.tease = damp(artifact.T.tease, sm.state === 'closed' && hoverTime >= 1.2 ? 1 : 0, 2.5, dt);
+  T.tease = damp(T.tease, sm.state === 'closed' && hoverTime >= 1.2 ? 1 : 0, 2.5, dt);
 
   if (!device.reduced && !sm.busy && sim.clock > nextTwitch) {
     nextTwitch = sim.clock + rand(7, 17);
@@ -1599,8 +1137,13 @@ requestAnimationFrame(frame);
 // ?debug: FPS + state overlay, and hooks to step the simulation by hand in tests
 if (DEBUG) {
   debugEl.hidden = false;
+  window.stage = {
+    setSpecies, species: SPECIES,
+    get current() { return currentSpecies; },
+    get memory() { return { ...renderer.info.memory, programs: renderer.info.programs.length }; }
+  };
   window.LA = {
-    sm, sim, input, artifact, story, ScrollTrigger,
+    sm, sim, input, story, ScrollTrigger, get artifact() { return artifact; },
     step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) tick(dt); post.render(); }
   };
 }

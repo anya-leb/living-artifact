@@ -208,3 +208,11 @@ Log of choices made while building v2. Newest at the bottom.
 - 2026-10-07 · Hero build: the vanishing point is the docked artifact's screen position (`perspective-origin` at 50% / 25%, recalculated on resize). Phone timing (×0.7, 3.5 screens) applies below 640px wide or on touch devices.
 - 2026-10-07 · Gallery feature added to this brief (section above). It is built in 7 phases, each committed and tagged `gallery-pN`, behind `?gallery` until Phase 6.
 - 2026-10-07 · Hero committed untuned as the gallery baseline and tagged `gallery-p0`. `DEPTH_TUNING` is still open for tuning.
+- 2026-10-07 · Separate species files win over "one self-contained index.html". The page is `index.html` plus ES modules (`lib/kit.js`, `species/*.js`), still with no build step. It needs a local server; opening the file directly no longer works.
+- 2026-10-07 · The Gallery replaces "Selected work"; there are no project cards. Page order: Story, Gallery, Approach, About, Contact.
+- 2026-10-07 · The 5 shell pieces map to those 5 sections: Story, Gallery, Approach, About, Contact.
+- 2026-10-07 · Order: Gallery Phase 1 comes before v2 step 3, so step 3 can work for any species.
+- 2026-10-07 · Gallery P1: "a piece is data" works as `species/<id>.js` exporting `config` (identity, palette, materials, geometry, motion, hover, bloom, particle colours) plus `build(config, ctx)` for its geometry recipe. The stage keeps a `RECIPES` registry keyed by `config.recipe`, so new species add a recipe once and any number of configs.
+- 2026-10-07 · Gallery P1: the transition channels `T` and the dock placement `DOCK` now belong to the stage, not the species. They survive a species swap. Particles keep a colour role and brightness per particle, so a new species recolours them without moving them.
+- 2026-10-07 · Gallery P1: the preview server now sends correct MIME types (ES modules need `text/javascript`). The refactor test harness blocks real (trusted) mouse events, because the pane's live cursor was leaking into the stepped comparison.
+- 2026-10-07 · Gallery P1 verified: 0 differing pixels against `gallery-p0` in 7 states (idle, hover/tease, burst, opening, open-docked, closing, closed-again). `window.stage.setSpecies(config)` (under `?debug`) hot-swaps; 12 swaps left GPU counts unchanged.
