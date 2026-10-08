@@ -6,7 +6,7 @@
 <title>The Living Artifact</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Newsreader:ital,opsz,wght@1,6..72,300&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Newsreader:ital,opsz,wght@1,6..72,300&family=Fraunces:opsz,wght,SOFT,WONK@9..144,100..900,0..100,0..1&family=Geist:wght@300..600&display=swap">
 <style>
 /* Layout: one full-bleed WebGL stage; a small museum placard sits centred near the lower edge. */
 :root{
@@ -17,6 +17,12 @@
   --frost:#9fd8ff;         /* glass edge light */
   --font-display:"Marcellus","Trajan Pro",Georgia,serif;
   --font-note:"Newsreader",Georgia,"Times New Roman",serif;
+  /* open state (Option B palette): petrol ground, mineral-white type */
+  --petrol:#0b1f25;
+  --mineral:#e6eef0;
+  --mineral-dim:rgba(230,238,240,.62);
+  --font-head:"Fraunces","Iowan Old Style",Georgia,serif;
+  --font-text:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;
   color-scheme:dark;
 }
 html,body{height:100%;margin:0;background:var(--void);color:var(--ink);overflow:hidden;overscroll-behavior:none}
@@ -49,14 +55,43 @@ html[data-state="open"] #stage{touch-action:pan-y}
 #artifactBtn:focus{outline:none}
 #artifactBtn:focus-visible{box-shadow:0 0 0 1px color-mix(in srgb,var(--frost) 55%,transparent),0 0 0 6px color-mix(in srgb,var(--frost) 10%,transparent)}
 
-/* step 2 placeholder site */
-#site{position:relative;z-index:2;max-width:880px;margin:0 auto;padding:46vh 16px 18vh;display:grid;gap:28px;
-  opacity:0;visibility:hidden;color:var(--ink)}
+/* open page */
+#site{position:relative;z-index:2;opacity:0;visibility:hidden;color:var(--mineral)}
+.rest{max-width:880px;margin:0 auto;padding:12vh 16px 18vh;display:grid;gap:28px}
+
+/* story hero: headlines on a Z axis that fall into the docked artifact */
+.story{position:relative;height:100vh;height:100svh}
+.story-pin{position:relative;height:100%;overflow:hidden}
+.story-plane{position:absolute;inset:0;transform-style:preserve-3d;will-change:transform}
+.beat{position:absolute;left:50%;top:63%;width:min(92vw,1400px);text-align:center;opacity:0;
+  transform:translate(-50%,-50%);will-change:transform,opacity,filter}
+.beat h2{margin:0;font-family:var(--font-head);font-weight:500;font-optical-sizing:none;
+  font-variation-settings:"wght" 560,"opsz" 144,"SOFT" 50,"WONK" 0;
+  font-size:clamp(40px,min(12vw,15vh),210px);line-height:.94;letter-spacing:-.015em;color:var(--mineral);text-wrap:balance}
+.beat h2:focus{outline:none}
+.beat h2 .w{display:inline-block}
+.beat p{margin:1.5rem auto 0;max-width:38ch;font:400 clamp(15px,1.2vw,18px)/1.5 var(--font-text);color:var(--mineral-dim);will-change:opacity}
+.edit-mark{font:500 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;color:var(--frost);opacity:.55;margin-left:.6em;vertical-align:.2em}
+.story-dots{position:absolute;right:max(16px,3vw);top:50%;transform:translateY(-50%);margin:0;padding:0;list-style:none;display:grid;gap:12px}
+.story-dots li{width:6px;height:6px;border-radius:50%;border:1px solid color-mix(in srgb,var(--mineral) 45%,transparent);transition:background-color .4s,border-color .4s}
+.story-dots li.on{background:var(--frost);border-color:var(--frost)}
+@media (max-width:640px){
+  .beat{top:64%}
+  .beat h2{font-size:clamp(34px,min(13vw,9.5vh),120px)}
+  .story-dots{right:10px;gap:10px}
+}
+/* reduced motion: no depth; the story stacks and each line fades in as it enters */
+.story.flat{height:auto}
+.story.flat .story-pin{height:auto;overflow:visible;padding:46vh 16px 0;display:grid;gap:32vh}
+.story.flat .story-plane{position:static;transform:none}
+.story.flat .beat{position:static;transform:none;width:auto;filter:none;opacity:0;transition:opacity .8s ease}
+.story.flat .beat.in{opacity:1}
+.story.flat .story-dots{display:none}
+
 .ph{border:1px dashed color-mix(in srgb,var(--frost) 35%,transparent);padding:28px;min-height:38vh;
   background:color-mix(in srgb,var(--void) 35%,transparent)}
 .ph h2{margin:0 0 .6rem;font:400 clamp(18px,2.2vw,26px)/1.2 var(--font-display);letter-spacing:.04em}
 .ph p{margin:0;font:300 italic 15px/1.5 var(--font-note);color:var(--ink-dim)}
-.ph-hero{min-height:22vh}
 .ph-index{min-height:0;display:flex;flex-wrap:wrap;gap:12px;padding:16px}
 .ph-index a{flex:1 1 72px;min-height:72px;display:grid;place-items:end start;padding:10px;color:var(--ink-dim);
   font:400 13px var(--font-display);text-decoration:none;border:1px solid color-mix(in srgb,var(--frost) 25%,transparent)}
@@ -81,18 +116,33 @@ html[data-state="open"] #stage{touch-action:pan-y}
 
 <!-- Step 2 placeholders: real content, type and scroll behaviour arrive in step 4. -->
 <main id="site" inert>
-  <section class="ph ph-hero" id="s-hero" data-piece="0">
-    <h2 id="heroHeading" tabindex="-1">[EDIT] 01 · Hero line</h2>
-    <p>Placeholder. Name and one-sentence positioning statement.</p>
+  <!-- Story hero: five beats on a Z axis. Every line is placeholder copy: [EDIT] -->
+  <section class="story" id="s-story" aria-label="The story">
+    <div class="story-pin">
+      <div class="story-plane">
+        <div class="beat"><h2 id="heroHeading" tabindex="-1">It was asleep for a very long time.</h2>
+          <p>Glass, liquid metal, porcelain, a little light.<span class="edit-mark">[EDIT]</span></p></div>
+        <div class="beat"><h2>You woke it.</h2>
+          <p>It noticed you before you noticed it.<span class="edit-mark">[EDIT]</span></p></div>
+        <div class="beat"><h2>It follows your hand.</h2>
+          <p>Move, and it leans in. Rush, and it drifts after you.<span class="edit-mark">[EDIT]</span></p></div>
+        <div class="beat"><h2>Every piece is different. They hold together.</h2>
+          <p>Like any good system.<span class="edit-mark">[EDIT]</span></p></div>
+        <div class="beat"><h2>Now look closer.</h2>
+          <p>Scroll on.<span class="edit-mark">[EDIT]</span></p></div>
+      </div>
+      <ol class="story-dots" aria-hidden="true"><li></li><li></li><li></li><li></li><li></li></ol>
+    </div>
   </section>
-  <nav class="ph ph-index" aria-label="Sections">
-    <a href="#s-hero">01</a><a href="#s-work">02</a><a href="#s-approach">03</a><a href="#s-about">04</a><a href="#s-contact">05</a>
-  </nav>
-  <section class="ph" id="s-work" data-piece="1"><h2>[EDIT] 02 · Selected work</h2><p>Placeholder for three project cards.</p></section>
-  <section class="ph" id="s-approach" data-piece="2"><h2>[EDIT] 03 · Approach</h2><p>Placeholder for three principles.</p></section>
-  <section class="ph" id="s-about" data-piece="3"><h2>[EDIT] 04 · About</h2><p>Placeholder for a paragraph and a portrait frame.</p></section>
-  <section class="ph" id="s-contact" data-piece="4"><h2>[EDIT] 05 · Contact</h2><p>Placeholder for email and LinkedIn.</p></section>
-  <p class="ph-close"><button id="closeLink" type="button">Close the artifact</button></p>
+  <div class="rest">
+    <nav class="ph ph-index" aria-label="Sections">
+      <a href="#s-story">01</a><a href="#s-approach">02</a><a href="#s-about">03</a><a href="#s-contact">04</a><a href="#s-contact">05</a>
+    </nav>
+    <section class="ph" id="s-approach"><h2>[EDIT] Approach</h2><p>Placeholder for three principles.</p></section>
+    <section class="ph" id="s-about"><h2>[EDIT] About</h2><p>Placeholder for a paragraph and a portrait frame.</p></section>
+    <section class="ph" id="s-contact"><h2>[EDIT] Contact</h2><p>Placeholder for email and LinkedIn.</p></section>
+    <p class="ph-close"><button id="closeLink" type="button">Close the artifact</button></p>
+  </div>
 </main>
 <div id="debug" hidden></div>
 
@@ -100,7 +150,8 @@ html[data-state="open"] #stage{touch-action:pan-y}
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
-  "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.13.0/index.js"
+  "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.13.0/index.js",
+  "gsap/": "https://cdn.jsdelivr.net/npm/gsap@3.13.0/"
 } }
 </script>
 <script type="module">
@@ -111,6 +162,16 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger.js';
+gsap.registerPlugin(ScrollTrigger);
+
+/* Story hero tuning: the four numbers to play with. */
+const DEPTH_TUNING = {
+  hold: 0.35,                // share of each headline's scroll length where it rests: sharp, still, readable
+  zDistance: 5000,           // px a headline travels back before the artifact absorbs it
+  blur: 8,                   // px of blur at the far end (and slightly less when it arrives up close)
+  screensPerHeadline: 1.25   // speed: viewport heights of scroll per transition (×0.7 on phones)
+};
 
 /*
   The Living Artifact. One file, five modules plus a small shared core:
@@ -121,6 +182,7 @@ import { gsap } from 'gsap';
     particles     motes, dust, sparks and the cursor field that disturbs them
     post          composer: clamp, bloom glow, tone mapping, lens finish
     input         pointer + keyboard, engagement and hover
+    story         the depth-scroll hero: headlines on a Z axis that fall into the artifact
     stateMachine  closed / opening / open / closing, the #open hash, GSAP timelines
 
   Construction order follows v1 (object ids and the Math.random() sequence),
@@ -775,6 +837,8 @@ function createArtifact({ scene, spot, coreLight }) {
     shockT = 0; shock.visible = true;
   }
   function fireSnap(particles) { particles.F.burst = -1.2; }
+  // a story line was absorbed: one small heartbeat and a brief inward swirl
+  function absorb(particles) { pulse = Math.max(pulse, 0.6); particles.F.burst = -0.6; }
   function updateEffects(dt, camera) {
     if (shockT >= 0) {
       shockT += dt; const p = clamp(shockT / 1.7);
@@ -785,9 +849,9 @@ function createArtifact({ scene, spot, coreLight }) {
   }
 
   return {
-    floatRig, view, T,
+    floatRig, view, T, DOCK_NDC_Y,
     hoverRadius: () => 1.15 * floatRig.scale.x,
-    advance, surprise, updateMotion, updateParts, updateGlow, updateEffects, fireBurst, fireSnap
+    advance, surprise, updateMotion, updateParts, updateGlow, updateEffects, fireBurst, fireSnap, absorb
   };
 }
 
@@ -1170,6 +1234,135 @@ function createInput({ button, camera, getCenter, getRadius, onActivate, onEngag
   return input;
 }
 
+/* =================================================================== story */
+// The depth-scroll hero. ScrollTrigger pins the section and scrubs `progress` (0 → 1).
+// Each frame every beat gets a depth d from that progress:
+//   d = 0   resting on the reading plane: sharp, full opacity
+//   d → 1   receding into the artifact (smaller, thinner, blurred, fading into the fog)
+//   d → -1  arriving from in front of the viewer (huge, heavier, blurred)
+// Departure and arrival overlap only while both lines are invisible, so two lines are never readable at once.
+function createStory({ section, artifact, particles }) {
+  const pin = section.querySelector('.story-pin');
+  const plane = section.querySelector('.story-plane');
+  const dots = [...section.querySelectorAll('.story-dots li')];
+  const PERSPECTIVE = 900, NEAR = PERSPECTIVE * 0.55;   // closest arrival: 2.2× size
+  const beats = [...section.querySelectorAll('.beat')].map(el => {
+    const h = el.querySelector('h2');
+    return { el, h, small: el.querySelector('p'), words: h.textContent.trim().split(/\s+/), lines: [], d: NaN, visible: true, absorbed: false };
+  });
+  const N = beats.length;
+  const state = { progress: 0 };
+  let flat = false, tiltX = 0, tiltY = 0;
+
+  const screens = () => DEPTH_TUNING.screensPerHeadline * (N - 1) * (device.coarse || innerWidth < 640 ? 0.7 : 1);
+
+  // Freeze each headline's line breaks at its resting weight, so animating `wght` never re-wraps it.
+  function lockLines(b) {
+    b.h.style.fontVariationSettings = '';
+    b.h.textContent = '';
+    const spans = b.words.map((w, k) => {
+      const sp = document.createElement('span'); sp.className = 'w'; sp.textContent = w;
+      b.h.append(sp); if (k < b.words.length - 1) b.h.append(' ');
+      return sp;
+    });
+    const rows = [];
+    for (const sp of spans) {
+      const top = sp.offsetTop, row = rows[rows.length - 1];
+      if (row && Math.abs(row.top - top) < 4) row.spans.push(sp); else rows.push({ top, spans: [sp] });
+    }
+    b.h.textContent = '';
+    b.lines = rows.map((row, r) => {
+      const ln = document.createElement('span');
+      ln.style.cssText = 'display:block;white-space:nowrap';
+      row.spans.forEach((sp, k) => { ln.append(sp); if (k < row.spans.length - 1) ln.append(' '); });
+      if (r < rows.length - 1) ln.append(' ');
+      b.h.append(ln);
+      return row.spans;
+    });
+    b.d = NaN;   // force a re-render
+  }
+
+  // the vanishing point is the docked artifact's position on screen
+  function aim() {
+    pin.style.perspectiveOrigin = `${innerWidth / 2}px ${((1 - artifact.DOCK_NDC_Y) / 2 * innerHeight).toFixed(1)}px`;
+  }
+
+  function build() {
+    flat = device.reduced;
+    section.classList.toggle('flat', flat);
+    if (flat) {   // reduced motion: no depth, the beats stack and fade in as they enter
+      const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) e.target.classList.add('in'); }), { threshold: 0.4 });
+      beats.forEach(b => io.observe(b.el));
+      return;
+    }
+    beats.forEach(lockLines);
+    pin.style.perspective = PERSPECTIVE + 'px';
+    aim();
+    gsap.to(state, {
+      progress: 1, ease: 'none',
+      scrollTrigger: { trigger: section, start: 'top top', end: () => '+=' + Math.round(innerHeight * screens()), pin: true, scrub: 1, invalidateOnRefresh: true }
+    });
+  }
+  function resize() { if (flat) return; beats.forEach(lockLines); aim(); }
+
+  function depthOf(i, u) {
+    const H = DEPTH_TUNING.hold;
+    if (i < N - 1 && u > i + H) return easeInOutCubic(clamp((u - i - H) / (1 - H) / 0.6));                // leaving: 0 → 1
+    if (i > 0 && u < i) return -(1 - easeOutCubic(clamp(((u - (i - 1) - H) / (1 - H) - 0.4) / 0.6)));      // arriving: -1 → 0
+    return 0;
+  }
+
+  function render(b, d) {
+    const far = Math.max(d, 0), near = Math.max(-d, 0);
+    const op = d >= 0 ? 1 - smooth(0.05, 0.55, far) : smooth(-0.6, -0.08, d);
+    if (op < 0.005) {    // fully gone: skip blur and type work entirely
+      if (b.visible) { b.el.style.opacity = '0'; b.el.style.filter = 'none'; b.visible = false; }
+      return;
+    }
+    b.visible = true;
+    const z = d >= 0 ? -far * DEPTH_TUNING.zDistance : near * NEAR;
+    const blur = DEPTH_TUNING.blur * (d >= 0 ? smooth(0, 0.7, far) : 0.9 * smooth(0, 0.8, near));
+    b.el.style.transform = `translate(-50%, -50%) translate3d(0, 0, ${z.toFixed(1)}px)`;
+    b.el.style.opacity = op.toFixed(3);
+    b.el.style.filter = blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : 'none';
+    b.small.style.opacity = (d >= 0 ? 1 - smooth(0, 0.28, far) : smooth(-0.35, -0.02, d)).toFixed(3);   // the small line leaves first
+    // the type breathes with depth: heavier and larger optical size up close, thinner and softer far away
+    const recede = smooth(0, 0.8, far), approach = smooth(0, 1, near);
+    b.h.style.fontVariationSettings =
+      `"wght" ${(lerp(560, 190, recede) + 160 * approach).toFixed(0)}, "opsz" ${lerp(144, 40, recede).toFixed(0)}, "SOFT" ${(50 + 50 * recede).toFixed(0)}, "WONK" 0`;
+    // tracking opens as the line recedes: words drift apart from the centre of their line (transform only)
+    const spread = recede * 0.16;
+    for (const line of b.lines) {
+      const c = (line.length - 1) / 2;
+      line.forEach((sp, k) => { sp.style.transform = spread ? `translateX(${((k - c) * spread).toFixed(3)}em)` : ''; });
+    }
+  }
+
+  function update(dt, input) {
+    if (flat) return;
+    // the text plane tilts a few degrees toward the cursor (not on touch)
+    tiltX = damp(tiltX, device.coarse ? 0 : input.x * 4, 3, dt);
+    tiltY = damp(tiltY, device.coarse ? 0 : input.y * 3, 3, dt);
+    plane.style.transform = `rotateX(${tiltY.toFixed(2)}deg) rotateY(${tiltX.toFixed(2)}deg)`;
+
+    const u = state.progress * (N - 1);
+    let active = 0, best = 9;
+    for (let i = 0; i < N; i++) {
+      const b = beats[i], d = depthOf(i, u);
+      if (Math.abs(d) < best) { best = Math.abs(d); active = i; }
+      // the artifact absorbs each line as it reaches the far end (on the way down only)
+      if (i < N - 1) {
+        if (!b.absorbed && d >= 0.85) { b.absorbed = true; artifact.absorb(particles); }
+        else if (d < 0.6) b.absorbed = false;
+      }
+      if (d !== b.d) { b.d = d; render(b, d); }
+    }
+    dots.forEach((el, i) => el.classList.toggle('on', i === active));
+  }
+
+  return { build, resize, update, state, get u() { return state.progress * (N - 1); } };
+}
+
 /* =================================================================== stateMachine */
 // closed -> opening -> open -> closing -> closed.
 // Input is locked during transitions; at most one request waits in the queue.
@@ -1218,7 +1411,7 @@ function createStateMachine({ artifact, particles, onChange }) {
     }
     return t
       // content goes first, then the pieces fly home, calmer and quicker than the opening
-      .to(site, { autoAlpha: 0, y: 12, duration: 0.35, ease: 'power1.in' }, 0)
+      .to(site, { autoAlpha: 0, duration: 0.35, ease: 'power1.in' }, 0)
       .call(() => scrollTo(0, 0), null, 0.35)
       .to(T, { dock: 0, duration: 0.8, ease: 'power2.inOut' }, 0.2)
       .to(T, { spin: '+=0.9', duration: 1.3, ease: 'power2.inOut' }, 0.2)
@@ -1253,7 +1446,11 @@ function createStateMachine({ artifact, particles, onChange }) {
   function settle(next) {
     tl = null;
     setState(next);
-    if (next === 'open') { site.inert = false; heroHeading.focus({ preventScroll: true }); }
+    if (next === 'open') {
+      gsap.set(site, { clearProps: 'transform' });   // a transformed ancestor would break the pinned story
+      ScrollTrigger.refresh();
+      site.inert = false; heroHeading.focus({ preventScroll: true });
+    }
     else artifactBtn.focus({ preventScroll: true });
     if (queued) { const q = queued; queued = null; sm.request(q.action, q.opts); }
   }
@@ -1328,6 +1525,11 @@ addEventListener('keydown', e => { if (e.key === 'Escape') sm.request('close'); 
 addEventListener('hashchange', () => sm.request(location.hash === '#open' ? 'open' : 'close', { fromHistory: true }));
 let openOnLoad = location.hash === '#open';
 
+const story = createStory({ section: document.getElementById('s-story'), artifact, particles });
+document.fonts.ready.then(() => story.build());
+let storyResize = 0;
+addEventListener('resize', () => { clearTimeout(storyResize); storyResize = setTimeout(story.resize, 150); });
+
 // keep the invisible button over the sculpture
 const btnV = new THREE.Vector3();
 function placeButton() {
@@ -1362,6 +1564,7 @@ function tick(dt) {
     if (burst) particles.F.burst = burst;
   }
 
+  if (sm.state !== 'closed') story.update(dt, input);
   artifact.updateMotion(dt, input, camera);
   artifact.updateParts(dt, input);
   stage.update(dt, input, artifact);
@@ -1388,7 +1591,7 @@ function frame(now) {
   if (firstFrame) { firstFrame = false; requestAnimationFrame(() => veil.classList.add('lift')); }
   if (DEBUG) {
     fpsT += raw; fpsN++;
-    if (fpsT > 0.5) { debugEl.textContent = `fps ${Math.round(fpsN / fpsT)}  dpr ${dpr}\nstate ${sm.state}${sm.queued ? '  queued ' + sm.queued : ''}`; fpsT = fpsN = 0; }
+    if (fpsT > 0.5) { debugEl.textContent = `fps ${Math.round(fpsN / fpsT)}  dpr ${dpr}\nstate ${sm.state}${sm.queued ? '  queued ' + sm.queued : ''}\nstory ${story.u.toFixed(2)} / 4`; fpsT = fpsN = 0; }
   }
 }
 requestAnimationFrame(frame);
@@ -1397,7 +1600,7 @@ requestAnimationFrame(frame);
 if (DEBUG) {
   debugEl.hidden = false;
   window.LA = {
-    sm, sim, input, artifact,
+    sm, sim, input, artifact, story, ScrollTrigger,
     step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) tick(dt); post.render(); }
   };
 }
