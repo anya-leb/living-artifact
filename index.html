@@ -99,6 +99,39 @@ html[data-state="open"] #stage{touch-action:pan-y}
 .ph-close{margin:0;text-align:center}
 .ph-close button{background:none;border:0;color:var(--ink-dim);font:300 italic 15px var(--font-note);cursor:pointer;text-decoration:underline;text-underline-offset:4px}
 .ph h2:focus{outline:none}
+/* gallery: four framed specimens hung like an exhibition wall. Frame and mat are borders, so the
+   window in the middle stays transparent and the live piece drawn on the canvas shows through. */
+.gallery{position:relative;max-width:1180px;margin:0 auto;padding:22vh 16px 8vh}
+.gallery-head{max-width:32ch;margin:0 0 9vh}
+.gallery-head h2{margin:0;font:400 clamp(30px,4.2vw,58px)/1.04 var(--font-head);font-variation-settings:"opsz" 144,"SOFT" 60;letter-spacing:-.01em;color:var(--mineral);text-wrap:balance}
+.gallery-head p{margin:1rem 0 0;font:400 15px/1.5 var(--font-text);color:var(--mineral-dim)}
+.wall{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));column-gap:clamp(16px,3vw,40px);row-gap:clamp(48px,8vh,96px);align-items:start}
+.exhibit{margin:0;display:grid;gap:16px;min-width:0}
+.exhibit:nth-child(1){grid-column:1 / span 5;--ar:4/5}
+.exhibit:nth-child(2){grid-column:7 / span 4;margin-top:16vh;--ar:3/4}
+.exhibit:nth-child(3){grid-column:2 / span 4;margin-top:-4vh;--ar:1/1}
+.exhibit:nth-child(4){grid-column:7 / span 5;margin-top:8vh;--ar:5/4}
+.frame{--core:#9fd8ff;position:relative;display:block;width:100%;padding:0;margin:0;background:transparent;cursor:pointer;
+  border:clamp(8px,1vw,13px) solid #23292d;border-image:linear-gradient(140deg,#434b51,#15191c 36%,#30373c 54%,#101316 78%,#262c30) 1;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--core) 26%,transparent),0 0 36px -10px color-mix(in srgb,var(--core) 34%,transparent),0 44px 70px -34px rgba(0,0,0,.9);
+  transition:box-shadow .45s ease}
+.frame:hover{box-shadow:0 0 0 1px color-mix(in srgb,var(--core) 55%,transparent),0 0 56px -8px color-mix(in srgb,var(--core) 50%,transparent),0 44px 70px -34px rgba(0,0,0,.9)}
+.frame:focus-visible{outline:none;box-shadow:0 0 0 2px var(--core),0 0 70px -6px var(--core),0 44px 70px -34px rgba(0,0,0,.9)}
+.mat{display:block;border:clamp(16px,2.6vw,34px) solid #0b1013;box-shadow:inset 0 0 0 1px rgba(255,255,255,.035)}
+.window{display:block;position:relative;aspect-ratio:var(--ar,4/5);box-shadow:inset 0 0 26px 6px rgba(0,0,0,.8),0 0 0 1px rgba(0,0,0,.7)}
+.window::after{content:"";position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;
+  background:linear-gradient(112deg,transparent calc(var(--sx,30%) - 24%),rgba(220,235,240,.07) var(--sx,30%),transparent calc(var(--sx,30%) + 20%))}
+.frame.dim .window::after{background:rgba(0,0,0,.35);mix-blend-mode:normal;transition:background .3s}
+.placard{display:grid;gap:4px;padding-left:2px}
+.placard .no{font:500 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--mineral-dim)}
+.placard .nm{font:400 clamp(19px,1.7vw,24px)/1.1 var(--font-head);font-variation-settings:"opsz" 72,"SOFT" 50;color:var(--mineral)}
+.placard .md{font:400 13px/1.45 var(--font-text);color:var(--mineral-dim)}
+@media (max-width:760px){.wall{grid-template-columns:minmax(0,1fr)}.exhibit:nth-child(n){grid-column:1;margin-top:0}}
+#stageCaption{position:fixed;left:0;top:0;z-index:3;pointer-events:none;opacity:0;
+  transition:opacity .9s ease;text-align:center;display:grid;gap:4px;width:max-content;max-width:calc(100vw - 32px)}
+#stageCaption.show{opacity:1}
+#stageCaption .no{font:500 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.12em;color:var(--core,var(--ember))}
+#stageCaption .nm{font:400 italic 17px/1.2 var(--font-head);font-variation-settings:"opsz" 48,"SOFT" 60;color:var(--mineral)}
 #debug{position:fixed;left:8px;top:8px;z-index:9;padding:6px 8px;background:rgba(0,0,0,.6);color:#9fd8ff;
   font:11px/1.3 ui-monospace,Menlo,monospace;pointer-events:none;white-space:pre}
 </style>
@@ -134,6 +167,19 @@ html[data-state="open"] #stage{touch-action:pan-y}
       <ol class="story-dots" aria-hidden="true"><li></li><li></li><li></li><li></li><li></li></ol>
     </div>
   </section>
+  <!-- Gallery: four live specimens. Click one to swap it with the piece on the main stage. Copy is placeholder: [EDIT] -->
+  <section class="gallery" id="s-gallery" aria-labelledby="galleryHeading">
+    <header class="gallery-head">
+      <h2 id="galleryHeading">Five of them were awake. Choose one.<span class="edit-mark">[EDIT]</span></h2>
+      <p>Each frame holds a living piece. Click one and it trades places with the piece above.</p>
+    </header>
+    <div class="wall">
+      <figure class="exhibit"><button class="frame" type="button"><span class="mat"><span class="window"></span></span></button><figcaption class="placard"></figcaption></figure>
+      <figure class="exhibit"><button class="frame" type="button"><span class="mat"><span class="window"></span></span></button><figcaption class="placard"></figcaption></figure>
+      <figure class="exhibit"><button class="frame" type="button"><span class="mat"><span class="window"></span></span></button><figcaption class="placard"></figcaption></figure>
+      <figure class="exhibit"><button class="frame" type="button"><span class="mat"><span class="window"></span></span></button><figcaption class="placard"></figcaption></figure>
+    </div>
+  </section>
   <div class="rest">
     <nav class="ph ph-index" aria-label="Sections">
       <a href="#s-story">01</a><a href="#s-approach">02</a><a href="#s-about">03</a><a href="#s-contact">04</a><a href="#s-contact">05</a>
@@ -144,6 +190,8 @@ html[data-state="open"] #stage{touch-action:pan-y}
     <p class="ph-close"><button id="closeLink" type="button">Close the artifact</button></p>
   </div>
 </main>
+<div id="stageCaption" aria-hidden="true"><span class="no"></span><span class="nm"></span></div>
+<p id="announcer" class="sr" aria-live="polite"></p>
 <div id="debug" hidden></div>
 
 <script type="importmap">
@@ -163,8 +211,13 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger.js';
-import { TAU, clamp, lerp, smooth, damp, rand, easeOutCubic, easeInOutCubic, NOISE, UV_VERT, color } from './lib/kit.js';
+import { TAU, clamp, lerp, smooth, damp, rand, easeOutCubic, easeInOutCubic, NOISE, UV_VERT, color, seeded, withRandom } from './lib/kit.js';
 import * as prime from './species/prime.js';
+import * as tideBell from './species/tide-bell.js';
+import * as clockworkSeed from './species/clockwork-seed.js';
+import * as porcelainCrown from './species/porcelain-crown.js';
+import * as staticGarden from './species/static-garden.js';
+import { createGallery } from './lib/gallery.js';
 import { buildEnvironment } from './lib/environment.js';
 import { createParticles } from './lib/particles.js';
 gsap.registerPlugin(ScrollTrigger);
@@ -256,6 +309,10 @@ function createStage() {
   // the room warms from near-black to deep petrol as the core lights the page
   const VOID = new THREE.Color(0x030407), PETROL = new THREE.Color(0x0b1f25);
   let lastWarm = 0;
+  // after a gallery swap the open room leans toward the new piece's core colour (none for prime)
+  const tint = new THREE.Color(0xffa35c), tintFrom = new THREE.Color(), tintTo = new THREE.Color(), petrolNow = new THREE.Color();
+  let tintAmount = 0, amountFrom = 0, amountTo = 0, tintK = 1, tintDirty = false;
+  function setTint(hex, amount) { tintFrom.copy(tint); amountFrom = tintAmount; tintTo.set(hex); amountTo = amount; tintK = 0; }
 
   const camera = new THREE.PerspectiveCamera(34, innerWidth / innerHeight, 0.1, 90);
   camera.position.set(0, 0.4, 9);
@@ -331,22 +388,30 @@ function createStage() {
     key.position.set(4 - input.x * 1.5 * engage, 1.2 + input.y * 2 * engage, 4.5);
     if (scene.environmentRotation) scene.environmentRotation.y = simT * 0.02 + input.x * 0.5 * engage;
 
-    if (T.warm !== lastWarm) {
-      lastWarm = T.warm;
-      scene.background.copy(VOID).lerp(PETROL, T.warm);
+    if (tintK < 1) {
+      tintK = Math.min(1, tintK + dt / 0.8);
+      const e = easeInOutCubic(tintK);
+      tint.lerpColors(tintFrom, tintTo, e); tintAmount = lerp(amountFrom, amountTo, e); tintDirty = true;
+    }
+    if (T.warm !== lastWarm || tintDirty) {
+      lastWarm = T.warm; tintDirty = false;
+      petrolNow.copy(PETROL).lerp(tint, tintAmount);
+      scene.background.copy(VOID).lerp(petrolNow, T.warm);
       scene.fog.color.copy(scene.background);
       document.body.style.backgroundColor = '#' + scene.background.getHexString();
     }
   }
 
-  return { scene, camera, spot, coreLight, resize, update };
+  return { scene, camera, spot, coreLight, resize, update, setTint };
 }
 
 /* =================================================================== species */
 // A species is data plus the build function for its geometry recipe (see species/prime.js).
 // The main stage holds one built species at a time; setSpecies swaps configs, never meshes.
-const RECIPES = { prime: prime.build };
-const SPECIES = { prime: prime.config };
+const ALL_SPECIES = [prime, tideBell, clockworkSeed, porcelainCrown, staticGarden];   // catalogue order = No. 01–05
+const RECIPES = Object.fromEntries(ALL_SPECIES.map(s => [s.config.recipe, s.build]));
+const SPECIES = Object.fromEntries(ALL_SPECIES.map(s => [s.config.id, s.config]));
+const catalogueNo = (config) => String(ALL_SPECIES.findIndex(s => s.config.id === config.id) + 1).padStart(2, '0');
 // transition channels shared by the state machine and whichever species holds the stage
 const T = { open: 0, flash: 0, spin: 0, slow: 1, tilt: 0, dock: 0, warm: 0, tease: 0, petals: Array.from({ length: 5 }, () => ({ v: 0 })) };
 // docked: top centre of the screen at ~30% height (step 3 adds the corner position)
@@ -401,7 +466,7 @@ function createPost({ scene, camera }) {
     finish.uniforms.uCA.value = device.reduced ? 0.0012 : 0.0014 + T.flash * 0.012 + open * 0.0025 + Math.min(mouseSpeed, 4) * 0.0005;
     bloomPass.strength = 0.42 + input.hover * 0.08 + open * 0.12 + T.flash * 0.45 + view.pulse * 0.15;
   }
-  return { setSize, update, render: () => composer.render() };
+  return { setSize, update, render: () => composer.render(), insertAfterScene: (pass) => composer.insertPass(pass, 1) };
 }
 
 /* =================================================================== input */
@@ -714,7 +779,7 @@ let artifact = RECIPES[currentSpecies.recipe](currentSpecies, speciesCtx);
 const particles = createParticles({ scene: stage.scene, palette: currentSpecies.particles, U, sim, device });
 const getArtifact = () => artifact;
 
-// Debug only: swap the main artifact for another species config, instantly.
+// Put another species on the main stage, instantly (the gallery swap animates around this).
 function setSpecies(config) {
   const build = RECIPES[config.recipe];
   if (!build) throw new Error(`No recipe "${config.recipe}". Known: ${Object.keys(RECIPES).join(', ')}`);
@@ -769,7 +834,7 @@ const input = createInput({
   onScrollIntent: () => { if (sm.state === 'closed') sm.request('open'); }
 });
 closeLink.addEventListener('click', () => sm.request('close'));
-addEventListener('keydown', e => { if (e.key === 'Escape') sm.request('close'); });
+addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (swap.tl) swap.tl.progress(1); sm.request('close'); });
 addEventListener('hashchange', () => sm.request(location.hash === '#open' ? 'open' : 'close', { fromHistory: true }));
 let openOnLoad = location.hash === '#open';
 
@@ -788,15 +853,78 @@ function placeButton() {
   const x = (btnV.x + 1) / 2 * innerWidth, y = (1 - btnV.y) / 2 * innerHeight;
   artifactBtn.style.width = artifactBtn.style.height = (2 * r).toFixed(1) + 'px';
   artifactBtn.style.transform = `translate(${(x - r).toFixed(1)}px, ${(y - r).toFixed(1)}px)`;
+  if (stageCaption.classList.contains('show')) stageCaption.style.transform = `translate(calc(${x.toFixed(1)}px - 50%), ${(y + r * 0.92).toFixed(1)}px)`;
 }
 
 let nextTwitch = rand(9, 15);
+
+/* gallery: four live frames below the story; clicking one swaps it with the main piece */
+const frameEls = [...document.querySelectorAll('#s-gallery .frame')];
+const stageCaption = document.getElementById('stageCaption'), announcer = document.getElementById('announcer');
+let gallery = null;
+function paintFrame(i) {
+  const cfg = gallery.cells[i].config, fig = frameEls[i].closest('.exhibit');
+  frameEls[i].style.setProperty('--core', cfg.coreColor);
+  frameEls[i].setAttribute('aria-label', `Swap ${cfg.name} onto the main stage`);
+  fig.querySelector('.placard').innerHTML = `<span class="no">No. ${catalogueNo(cfg)}</span><span class="nm">${cfg.name}</span><span class="md">${cfg.medium}</span>`;
+}
+function buildGallery() {
+  if (gallery) return;
+  // built under its own random generator (three.js draws object ids from Math.random too), so the
+  // main stage's random sequence, and with it the seeded refactor tests, stays exactly as before
+  withRandom(seeded(9001), () => {
+    gallery = createGallery({ sim, U, device, envTex: stage.scene.environment, recipes: RECIPES, getDpr: () => dpr });
+    ['tide-bell', 'clockwork-seed', 'porcelain-crown', 'static-garden'].forEach((id, i) => {
+      const cell = gallery.addCell(frameEls[i].querySelector('.window'), frameEls[i], SPECIES[id], 101 + i * 17);
+      renderer.compile(cell.scene, cell.camera);
+      paintFrame(i);
+    });
+    post.insertAfterScene(gallery.pass);
+  });
+}
+setTimeout(buildGallery, 1200);   // after the intro settles, so building never stutters the first seconds
+
+// The swap: both pieces shrink into their cores, trade configs, and grow back; the new one arrives
+// with a small burst and the room tints toward its colour. ~1.2s; input locked, one click queued.
+const mainSwap = { squash: 0 };
+const swap = { tl: null, queued: -1 };
+function requestSwap(i) {
+  if (!gallery || sm.state !== 'open') return;
+  if (swap.tl) { swap.queued = i; return; }
+  const cell = gallery.cells[i], incoming = cell.config, outgoing = currentSpecies, R = device.reduced;
+  const out = R ? 0.18 : 0.42, back = R ? 0.22 : 0.75;
+  frameEls[i].classList.add('dim');
+  swap.tl = gsap.timeline({ paused: true, onComplete() {
+      swap.tl = null; frameEls[i].classList.remove('dim');
+      const q = swap.queued; swap.queued = -1; if (q >= 0) requestSwap(q);
+    } })
+    .to([mainSwap, cell], { squash: 0.94, duration: out, ease: 'power2.in' }, 0)
+    .call(() => {
+      setSpecies(incoming);
+      gallery.setSpecies(cell, outgoing);
+      paintFrame(i);
+      stage.setTint(incoming.coreColor, incoming.id === 'prime' ? 0 : 0.05);
+      document.documentElement.style.setProperty('--core', incoming.coreColor);
+      stageCaption.querySelector('.no').textContent = `No. ${catalogueNo(incoming)} · now on the stage`;
+      stageCaption.querySelector('.nm').textContent = incoming.name;
+      stageCaption.classList.add('show'); clearTimeout(swap.captionTimer);
+      swap.captionTimer = setTimeout(() => stageCaption.classList.remove('show'), 3800);
+      announcer.textContent = `${incoming.name} is now on the main stage. ${outgoing.name} moved into its frame.`;
+    }, null, out)
+    .to([mainSwap, cell], { squash: 0, duration: back, ease: R ? 'none' : 'back.out(1.6)' }, out + 0.02);
+  if (!R) swap.tl
+    .to(T, { spin: '+=' + Math.PI, duration: out + back, ease: 'power2.inOut' }, 0)
+    .to(T, { flash: 0.6, duration: 0.08, ease: 'sine.in' }, out + 0.04).to(T, { flash: 0, duration: 0.45, ease: 'sine.out' }, out + 0.12)
+    .call(() => { artifact.fireBurst(particles); particles.F.burst *= 0.4; }, null, out + 0.06);   // a small version of the bloom
+}
+frameEls.forEach((el, i) => el.addEventListener('click', () => requestSwap(i)));
 
 /* one simulation step; order matters (springs read the input, particles read the artifact) */
 function tick(dt) {
   sim.clock += dt;
   if (openOnLoad && sim.clock > 0.9) { openOnLoad = false; sm.request('open', { fromHistory: true }); }
   sm.advance(dt);
+  if (swap.tl) swap.tl.time(swap.tl.time() + dt);
   artifact.advance();
   sim.sdt = dt * T.slow;
   sim.simT += sim.sdt;
@@ -814,11 +942,13 @@ function tick(dt) {
 
   if (sm.state !== 'closed') story.update(dt, input);
   artifact.updateMotion(dt, input, camera);
+  if (mainSwap.squash > 0) artifact.floatRig.scale.multiplyScalar(Math.max(0.001, 1 - mainSwap.squash));
   artifact.updateParts(dt, input, camera);
   stage.update(dt, input, artifact);
   artifact.updateGlow(camera, input);
   artifact.updateEffects(dt, camera);
   particles.update(dt, input, camera, artifact);
+  if (gallery) { gallery.measure(sm.state === 'open'); gallery.update(dt, input); }
 
   particles.syncUniforms(camera, artifact, innerHeight * dpr);
   U.time.value = sim.clock;
