@@ -82,3 +82,6 @@ Log of choices made while building v2. Newest at the bottom.
 - 2026-10-07 · Project folder is `Claude Code/living-artifact/` (v1 lives here). The spec came from `Claude cowork/OUTPUTS/living-artifact/LANDING_PAGE_PROMPT.md`; this file is its copy.
 - 2026-10-07 · Git repo started in this folder. Commit `5357e93` is v1 untouched. One commit per build step.
 - 2026-10-07 · Local preview: `preview_start {name: "living-artifact"}` (an inline Node static server on port 5188). Python's `http.server` can't read ~/Desktop, and Vite would swap in an older Three.js.
+- 2026-10-07 · Open-state look: **Option B, "Specimen lab"**. Ground warms from blue-black to deep petrol; mineral-white text; frost leads, ember only in the core. Bodoni Moda (display, high-contrast italic) + IBM Plex Sans (text) + IBM Plex Mono (tags, catalogue numbers). Cards: clear frosted glass, 1px border, corner registration marks, mono catalogue numbers.
+- 2026-10-07 · Step 1 keeps v1's object-creation order and `Math.random()` call order, so v1 and the refactor can be compared pixel for pixel under a fixed seed.
+- 2026-10-07 · Step 1 verified: v1 and the refactor give 0 differing pixels in 6 states (idle, hover, burst, open, closing, after) at a fixed seed with manually stepped frames. Harness lives in `.test/` (git-ignored locally); `?debug` exposes `window.LA.step(n)`.
