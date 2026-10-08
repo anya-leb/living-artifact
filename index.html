@@ -121,7 +121,9 @@ html[data-state="open"] #stage{touch-action:pan-y}
 .window{display:block;position:relative;aspect-ratio:var(--ar,4/5);box-shadow:inset 0 0 26px 6px rgba(0,0,0,.8),0 0 0 1px rgba(0,0,0,.7)}
 .window::after{content:"";position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;
   background:linear-gradient(112deg,transparent calc(var(--sx,30%) - 24%),rgba(220,235,240,.07) var(--sx,30%),transparent calc(var(--sx,30%) + 20%))}
-.frame.dim .window::after{background:rgba(0,0,0,.35);mix-blend-mode:normal;transition:background .3s}
+.window::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:#020406;opacity:0;transition:opacity .34s ease}
+.frame.dim .window::before{opacity:.5;transition-duration:.12s}
+.frame.shut .window::before{opacity:.94;transition-duration:.08s}
 .placard{display:grid;gap:4px;padding-left:2px}
 .placard .no{font:500 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--mineral-dim)}
 .placard .nm{font:400 clamp(19px,1.7vw,24px)/1.1 var(--font-head);font-variation-settings:"opsz" 72,"SOFT" 50;color:var(--mineral)}
@@ -829,13 +831,13 @@ const input = createInput({
   button: artifactBtn, camera,
   getCenter: (v) => artifact.floatRig.getWorldPosition(v),
   getRadius: () => artifact.hoverRadius(),
-  onActivate: () => sm.request('toggle'),
+  onActivate: () => { finishSwap(); sm.request('toggle'); },
   onEngage: requestDismiss,
   onScrollIntent: () => { if (sm.state === 'closed') sm.request('open'); }
 });
-closeLink.addEventListener('click', () => sm.request('close'));
-addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (swap.tl) swap.tl.progress(1); sm.request('close'); });
-addEventListener('hashchange', () => sm.request(location.hash === '#open' ? 'open' : 'close', { fromHistory: true }));
+closeLink.addEventListener('click', () => { finishSwap(); sm.request('close'); });
+addEventListener('keydown', e => { if (e.key !== 'Escape') return; finishSwap(); sm.request('close'); });
+addEventListener('hashchange', () => { finishSwap(); sm.request(location.hash === '#open' ? 'open' : 'close', { fromHistory: true }); });
 let openOnLoad = location.hash === '#open';
 
 const story = createStory({ section: document.getElementById('s-story'), getArtifact, particles });
@@ -884,38 +886,143 @@ function buildGallery() {
 }
 setTimeout(buildGallery, 1200);   // after the intro settles, so building never stutters the first seconds
 
-// The swap: both pieces shrink into their cores, trade configs, and grow back; the new one arrives
-// with a small burst and the room tints toward its colour. ~1.2s; input locked, one click queued.
+// The swap. Both pieces fly: the chosen one lifts out of its frame toward the viewer and arcs up to
+// the stage, unfolding into its open pose; the stage piece arcs down the mirrored path, folding as it
+// goes, and sinks into the frame behind darkened glass. Spark trails stream behind both. ~1.45s,
+// input locked, one click queued, Esc completes it. Reduced motion: a quick shrink-and-grow instead.
 const mainSwap = { squash: 0 };
-const swap = { tl: null, queued: -1 };
+const swap = { tl: null, queued: -1, captionTimer: 0 };
+const flight = { active: false, k: 0, sink: 0, side: 1, cell: null, flyer: null };
+const flyerT = { open: 0, flash: 0, spin: 0, slow: 1, tilt: 0, dock: 0, warm: 0, tease: 0, petals: Array.from({ length: 5 }, () => ({ v: 0 })) };
+const flyerInput = { x: 0, y: 0, px: 0, py: 0, inside: false, lastMove: -100, flickX: 0, flickY: 0, fieldReset: true, engage: 0.2, hover: 0, hit: false };
+let flyerLight = null;
+const fv = { a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Vector3(), t: new THREE.Vector3(), dock: new THREE.Vector3(), frame: new THREE.Vector3(), outA: new THREE.Vector3(), outB: new THREE.Vector3() };
+
+// the point on the artifact's depth plane that sits under the centre of a frame's window
+function framePoint(rect, out) {
+  const nx = (rect.left + rect.width / 2) / innerWidth * 2 - 1, ny = -((rect.top + rect.height / 2) / innerHeight * 2 - 1);
+  out.set(0, 0, 0).project(camera);
+  return out.set(nx, ny, out.z).unproject(camera);
+}
+// the scale at which a piece at `p` in the main scene looks as big as it does inside that frame
+function frameScale(rect, cell, p) {
+  const mainVisible = 2 * camera.position.distanceTo(p) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const cellVisible = 2 * cell.camera.position.length() * Math.tan(THREE.MathUtils.degToRad(cell.camera.fov / 2));
+  return rect.height / innerHeight * mainVisible / cellVisible;
+}
+// a quadratic arc from p0 to p1 that bows sideways (`side`) and toward the viewer
+function arc(p0, p1, side, t, out) {
+  const mid = fv.c.copy(p0).add(p1).multiplyScalar(0.5);
+  const toCam = fv.t.copy(camera.position).sub(mid).normalize();
+  const dir = fv.a.copy(p1).sub(p0), len = dir.length();
+  const perp = fv.b.crossVectors(dir, toCam).normalize().multiplyScalar(side * len * 0.3);
+  mid.add(perp).addScaledVector(toCam, Math.min(2.4, len * 0.5));
+  const u = 1 - t;
+  return out.copy(p0).multiplyScalar(u * u).addScaledVector(mid, 2 * u * t).addScaledVector(p1, t * t);
+}
+
+// runs right after the stage piece's own motion each frame: overrides where both pieces are
+function updateFlight(dt) {
+  if (!flight.active) return;
+  const cell = flight.cell, rect = cell.rect, e = easeInOutCubic(clamp(flight.k));
+  fv.dock.copy(artifact.floatRig.position);                 // where the stage piece belongs right now
+  const dockScale = artifact.floatRig.scale.x;
+  framePoint(rect, fv.frame);
+  const sFrame = frameScale(rect, cell, fv.frame);
+  // incoming: frame → stage
+  arc(fv.frame, fv.dock, flight.side, e, fv.outA);
+  artifact.floatRig.position.copy(fv.outA);
+  artifact.floatRig.scale.setScalar(lerp(sFrame, dockScale, e));
+  // outgoing: stage → frame, on the mirrored arc, so they cross
+  const fl = flight.flyer;
+  if (fl) {
+    fl.advance();
+    fl.updateMotion(dt, flyerInput, camera);
+    arc(fv.dock, fv.frame, -flight.side, e, fv.outB);
+    fl.floatRig.position.copy(fv.outB);
+    fl.floatRig.scale.setScalar(lerp(dockScale, sFrame, e) * (1 - 0.85 * flight.sink));
+    fl.updateParts(dt, flyerInput, camera);
+    fl.updateGlow(camera, flyerInput);
+    fl.updateEffects(dt, camera);
+  }
+  if (flight.k > 0.02 && flight.k < 0.98) {
+    particles.emit(fv.outA.x, fv.outA.y, fv.outA.z, 2);
+    if (fl) particles.emit(fv.outB.x, fv.outB.y, fv.outB.z, 2);
+  }
+}
+
+function removeFlyer() {
+  if (flight.flyer) { flight.flyer.dispose(); flight.flyer = null; }
+  if (flyerLight) flyerLight.intensity = 0;
+}
+
+// captions, placard, tint and announcement once the new piece holds the stage
+function land(i, incoming, outgoing) {
+  paintFrame(i);
+  stage.setTint(incoming.coreColor, incoming.id === 'prime' ? 0 : 0.05);
+  document.documentElement.style.setProperty('--core', incoming.coreColor);
+  stageCaption.querySelector('.no').textContent = `No. ${catalogueNo(incoming)} · now on the stage`;
+  stageCaption.querySelector('.nm').textContent = incoming.name;
+  stageCaption.classList.add('show'); clearTimeout(swap.captionTimer);
+  swap.captionTimer = setTimeout(() => stageCaption.classList.remove('show'), 3800);
+  announcer.textContent = `${incoming.name} is now on the main stage. ${outgoing.name} moved into its frame.`;
+}
+
+function finishSwap() { if (swap.tl) swap.tl.progress(1); }
+function afterSwap() {
+  swap.tl = null;
+  const q = swap.queued; swap.queued = -1;
+  if (q >= 0) requestSwap(q);
+}
+
 function requestSwap(i) {
   if (!gallery || sm.state !== 'open') return;
   if (swap.tl) { swap.queued = i; return; }
-  const cell = gallery.cells[i], incoming = cell.config, outgoing = currentSpecies, R = device.reduced;
-  const out = R ? 0.18 : 0.42, back = R ? 0.22 : 0.75;
-  frameEls[i].classList.add('dim');
+  const cell = gallery.cells[i], incoming = cell.config, outgoing = currentSpecies, frame = frameEls[i];
+  frame.classList.add('dim');
+  if (device.reduced) return crossfadeSwap(i, cell, incoming, outgoing, frame);
+
   swap.tl = gsap.timeline({ paused: true, onComplete() {
-      swap.tl = null; frameEls[i].classList.remove('dim');
-      const q = swap.queued; swap.queued = -1; if (q >= 0) requestSwap(q);
+      removeFlyer();
+      flight.active = false; flight.cell = null; cell.hideArt = false;
+      frame.classList.remove('dim', 'shut');
+      afterSwap();
     } })
-    .to([mainSwap, cell], { squash: 0.94, duration: out, ease: 'power2.in' }, 0)
     .call(() => {
-      setSpecies(incoming);
-      gallery.setSpecies(cell, outgoing);
-      paintFrame(i);
-      stage.setTint(incoming.coreColor, incoming.id === 'prime' ? 0 : 0.05);
-      document.documentElement.style.setProperty('--core', incoming.coreColor);
-      stageCaption.querySelector('.no').textContent = `No. ${catalogueNo(incoming)} · now on the stage`;
-      stageCaption.querySelector('.nm').textContent = incoming.name;
-      stageCaption.classList.add('show'); clearTimeout(swap.captionTimer);
-      swap.captionTimer = setTimeout(() => stageCaption.classList.remove('show'), 3800);
-      announcer.textContent = `${incoming.name} is now on the main stage. ${outgoing.name} moved into its frame.`;
-    }, null, out)
-    .to([mainSwap, cell], { squash: 0, duration: back, ease: R ? 'none' : 'back.out(1.6)' }, out + 0.02);
-  if (!R) swap.tl
-    .to(T, { spin: '+=' + Math.PI, duration: out + back, ease: 'power2.inOut' }, 0)
-    .to(T, { flash: 0.6, duration: 0.08, ease: 'sine.in' }, out + 0.04).to(T, { flash: 0, duration: 0.45, ease: 'sine.out' }, out + 0.12)
-    .call(() => { artifact.fireBurst(particles); particles.F.burst *= 0.4; }, null, out + 0.06);   // a small version of the bloom
+      // the flyer starts as an exact copy of the stage piece's current pose channels
+      Object.assign(flyerT, { open: T.open, flash: 0, spin: T.spin, slow: 1, tilt: 0, dock: 0, warm: 0, tease: 0 });
+      flyerT.petals.forEach((p, k) => { p.v = T.petals[k].v; });
+      if (!flyerLight) { flyerLight = new THREE.PointLight(0xffffff, 0, 0, 2); stage.scene.add(flyerLight); }
+      flight.flyer = RECIPES[outgoing.recipe](outgoing, { ...speciesCtx, coreLight: flyerLight, T: flyerT, noBeam: true });
+      setSpecies(incoming);                                    // the stage now holds the chosen piece, still folded
+      T.open = 0; T.petals.forEach(p => { p.v = 0; });
+      gallery.setSpecies(cell, outgoing); cell.hideArt = true;  // the frame waits empty behind dimmed glass
+      flight.cell = cell; flight.k = 0; flight.sink = 0; flight.active = true;
+      flight.side = cell.rect.left + cell.rect.width / 2 < innerWidth / 2 ? 1 : -1;
+    }, null, 0.12)
+    .fromTo(flight, { k: 0 }, { k: 1, duration: 0.9, ease: 'none', immediateRender: false }, 0.12)
+    .to(T, { spin: '+=' + Math.PI, duration: 0.9, ease: 'power2.inOut' }, 0.12)
+    .to(flyerT, { spin: '-=' + Math.PI, open: 0, duration: 0.85, ease: 'power2.inOut' }, 0.14)
+    .to(flyerT.petals, { v: 0, duration: 0.7, ease: 'power2.inOut', stagger: 0.02 }, 0.14)
+    // arrival: the stage piece unfolds into its open pose; a flash and a small burst
+    .to(T.petals, { v: 1, duration: 0.55, ease: 'back.out(1.3)', stagger: 0.03 }, 0.9)
+    .to(T, { open: 1, duration: 0.55, ease: 'back.out(1.3)' }, 0.9)
+    .to(T, { flash: 0.6, duration: 0.08, ease: 'sine.in' }, 1.0).to(T, { flash: 0, duration: 0.4, ease: 'sine.out' }, 1.08)
+    .call(() => {
+      artifact.fireBurst(particles); particles.F.burst *= 0.4;
+      frame.classList.add('shut');                             // the glass darkens as the flyer sinks in
+      land(i, incoming, outgoing);
+    }, null, 1.02)
+    .to(flight, { sink: 1, duration: 0.08, ease: 'power1.in' }, 1.02)
+    .call(() => { removeFlyer(); cell.hideArt = false; frame.classList.remove('shut', 'dim'); }, null, 1.12);
+}
+
+// reduced motion: no flight path, both pieces shrink away and grow back in place (~0.4s)
+function crossfadeSwap(i, cell, incoming, outgoing, frame) {
+  swap.tl = gsap.timeline({ paused: true, onComplete() { frame.classList.remove('dim'); afterSwap(); } })
+    .to([mainSwap, cell], { squash: 0.94, duration: 0.18, ease: 'power2.in' }, 0)
+    .call(() => { setSpecies(incoming); gallery.setSpecies(cell, outgoing); land(i, incoming, outgoing); }, null, 0.18)
+    .to([mainSwap, cell], { squash: 0, duration: 0.22, ease: 'none' }, 0.2);
 }
 frameEls.forEach((el, i) => el.addEventListener('click', () => requestSwap(i)));
 
@@ -943,6 +1050,7 @@ function tick(dt) {
   if (sm.state !== 'closed') story.update(dt, input);
   artifact.updateMotion(dt, input, camera);
   if (mainSwap.squash > 0) artifact.floatRig.scale.multiplyScalar(Math.max(0.001, 1 - mainSwap.squash));
+  updateFlight(dt);
   artifact.updateParts(dt, input, camera);
   stage.update(dt, input, artifact);
   artifact.updateGlow(camera, input);

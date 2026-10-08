@@ -333,7 +333,7 @@ export function build(config, ctx) {
   const beam = new THREE.Mesh(beamGeo, beamMat);
   beam.position.copy(spot.position);
   beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), spot.target.position.clone().sub(spot.position).normalize());
-  addToScene(beam);
+  if (!ctx.noBeam) addToScene(beam);   // a piece in flight doesn't bring its own spotlight beam
 
   /* ---- motion state */
   const rotY = spring(), rotX = spring(), leanX = spring(), leanZ = spring(), shX = spring(), shY = spring(), pendX = spring(), pendZ = spring();
@@ -512,6 +512,7 @@ export function build(config, ctx) {
     config, group: floatRig, floatRig, view, T,
     materials: { glass: glassMat, chrome: chromeMat, gold: goldMat, porcelain: porcelainMat, liquidMetal: blobMat, core: coreMat },
     hoverRadius: () => 1.15 * floatRig.scale.x,
-    advance, surprise, updateMotion, updateParts, updateGlow, updateEffects, fireBurst, fireSnap, absorb, dispose
+    advance, surprise, updateMotion, updateParts, updateGlow, updateEffects, fireBurst, fireSnap, absorb, dispose,
+    setVisible(v) { for (const o of added) o.visible = v; if (!v) shock.visible = false; }
   };
 }
